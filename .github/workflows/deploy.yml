@@ -28,10 +28,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
 
       - name: Build
-        run: node node_modules/.bin/vite build
+        run: npx vite build
         env:
           NODE_ENV: production
 

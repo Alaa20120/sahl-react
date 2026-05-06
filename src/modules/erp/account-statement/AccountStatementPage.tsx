@@ -35,7 +35,40 @@ export default function AccountStatementPage() {
     if (!customerId) return []
     const isSupplier = customer?.type === 'supplier'
     const items: { date: string; desc: string; debit: number; credit: number; balance: number; ref: string }[] = []
+    
+    // Calculate opening balance from all invoices BEFORE the from date
     let running = 0
+    if (!isSupplier) {
+      const beforeInvoices = invoices.filter(inv => inv.customerId === customerId && inv.date < from && inv.status !== 'draft')
+      for (const inv of beforeInvoices) {
+        running += inv.total // Invoice increases what customer owes (debit)
+        const paid = inv.paidAmount ?? (inv.status === 'paid' ? inv.total : 0)
+        running -= paid // Payment decreases what customer owes (credit)
+      }
+    } else {
+      const beforePurchases = purchases.filter(p => {
+        const matchVendor = (p as any).vendor?.toLowerCase().includes(customer?.name.toLowerCase() ?? '') ||
+          (p as any).vendorId === customerId
+        return matchVendor && p.date < from
+      })
+      for (const po of beforePurchases) {
+        running += po.total
+        const paid = po.paid ?? 0
+        running -= paid
+      }
+    }
+    
+    // Add opening balance row
+    if (running !== 0) {
+      items.push({ 
+        date: from, 
+        desc: 'رصيد افتتاحي', 
+        debit: running > 0 ? running : 0, 
+        credit: running < 0 ? Math.abs(running) : 0, 
+        balance: running, 
+        ref: 'OB' 
+      })
+    }
 
     if (isSupplier) {
       // For suppliers: purchases from them
@@ -48,11 +81,12 @@ export default function AccountStatementPage() {
         .sort((a, b) => a.date.localeCompare(b.date))
 
       for (const po of supplierPurchases) {
-        running += po.total
+        running += po.total // Purchase increases what we owe supplier (credit for us)
         items.push({ date: po.date, desc: `فاتورة شراء ${(po as any).number ?? po.id}`, debit: 0, credit: po.total, balance: running, ref: (po as any).number ?? po.id })
-        if (po.paid && po.paid > 0) {
-          running -= po.paid
-          items.push({ date: po.date, desc: `دفعة للمورد — ${(po as any).number ?? po.id}`, debit: po.paid, credit: 0, balance: running, ref: `PMT-${po.id}` })
+        const paid = po.paid ?? 0
+        if (paid > 0) {
+          running -= paid // Payment decreases what we owe (debit for us)
+          items.push({ date: po.date, desc: `دفعة للمورد — ${(po as any).number ?? po.id}`, debit: paid, credit: 0, balance: running, ref: `PMT-${po.id}` })
         }
       }
     } else {
@@ -62,11 +96,11 @@ export default function AccountStatementPage() {
         .sort((a, b) => a.date.localeCompare(b.date))
 
       for (const inv of customerInvoices) {
-        running += inv.total
+        running += inv.total // Invoice increases what customer owes us (debit)
         items.push({ date: inv.date, desc: `فاتورة ${inv.number}`, debit: inv.total, credit: 0, balance: running, ref: inv.number })
         const paid = inv.paidAmount ?? (inv.status === 'paid' ? inv.total : 0)
         if (paid > 0) {
-          running -= paid
+          running -= paid // Payment decreases what customer owes (credit)
           items.push({ date: inv.date, desc: `دفعة مستلمة — ${inv.number}`, debit: 0, credit: paid, balance: running, ref: `PMT-${inv.id.slice(-6)}` })
         }
       }

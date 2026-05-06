@@ -450,7 +450,7 @@ export default function ReportsPage() {
   // ── Real computed data ────────────────────────────────────────────────────
   const d = useMemo(() => {
     const paid = invoices.filter(i => i.status !== 'draft')
-    const totalRevenue = paid.reduce((s, i) => s + i.amount, 0)
+    const totalRevenue = paid.reduce((s, i) => s + i.total, 0)
     const paidRevenue = paid.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0)
     const pendingRevenue = paid.filter(i => i.status === 'pending').reduce((s, i) => s + i.total, 0)
     const overdueRevenue = paid.filter(i => i.status === 'overdue').reduce((s, i) => s + i.total, 0)
@@ -464,6 +464,8 @@ export default function ReportsPage() {
     const inventoryValue = products.reduce((s, p) => s + p.stock * p.costPrice, 0)
     const cashBalance = accounts.reduce((s, a) => s + a.balance, 0)
     const grossProfit = totalRevenue + delegateRevenue - totalPurchases
+    // Cost of goods sold = purchases (simplified)
+    const cogs = totalPurchases
     const operatingProfit = grossProfit - totalExpenses
     const vatOut = totalTax + delegateTax
     const vatNet = Math.max(0, vatOut - purchaseTax)

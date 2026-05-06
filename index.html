@@ -13,6 +13,19 @@
     <title>سهل — نظام ERP عربي متكامل</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <!-- GitHub Pages SPA redirect handler -->
+    <script>
+      (function(l){
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s){
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location))
+    </script>
   </head>
   <body>
     <div id="root"></div>

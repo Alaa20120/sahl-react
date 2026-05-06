@@ -14,8 +14,8 @@ interface InvoiceStore {
   removeAttachment: (invoiceId: string, attachmentId: string) => void
 }
 
-// Count existing invoices to set initial counter
-const initialCounter = INVOICES.length
+// Start from 0 — no mock data
+const initialCounter = 0
 
 export const useInvoiceStore = create<InvoiceStore>()(
   persist(

@@ -695,6 +695,53 @@ tbody tr:hover td { background: #FAFBFC; }
   .bottom-nav { display: flex; }
 }
 
+/* ─── MOBILE-ONLY / DESKTOP-ONLY helpers ─────────── */
+.mobile-only { display: none !important; }
+@media (max-width: 768px) {
+  .mobile-only { display: flex !important; }
+
+  /* POS: stack products above cart on mobile */
+  #pos-mobile-tabs { display: flex !important; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Modal as bottom sheet on mobile */
+  .modal-overlay-mobile {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .modal-sheet-mobile {
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92vh !important;
+  }
+
+  /* Delegate page: stats grid single column on very small */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Fix filter bars to wrap */
+  .filter-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .filter-bar .search-box { width: 100%; flex: none; }
+
+  /* Tabs: scrollable on mobile */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+  }
+  .tab-btn { white-space: nowrap; flex-shrink: 0; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
 /* ─── MOBILE CARDS (table alternative) ───────────── */
 .mobile-card-list {
   display: none;

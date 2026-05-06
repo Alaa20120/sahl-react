@@ -201,9 +201,21 @@ export default function DelegatePOSPage() {
     <>
       <PageHeader title="نقطة البيع" subtitle="بيع سريع للعملاء" />
 
+      {/* Mobile: tabs to switch between products and cart */}
+      <div className="mobile-only" style={{ display: 'none', gap: 0, marginBottom: 16, background: 'var(--card)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }} id="pos-mobile-tabs">
+        <button id="pos-tab-products" onClick={() => { document.getElementById('pos-products')!.style.display='block'; document.getElementById('pos-cart')!.style.display='none'; document.getElementById('pos-tab-products')!.style.background='var(--primary)'; document.getElementById('pos-tab-products')!.style.color='#fff'; document.getElementById('pos-tab-cart')!.style.background='var(--card)'; document.getElementById('pos-tab-cart')!.style.color='var(--text)' }}
+          style={{ flex: 1, padding: '12px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, background: 'var(--primary)', color: '#fff' }}>
+          <i className="fa fa-box" style={{ marginLeft: 6 }} />المنتجات
+        </button>
+        <button id="pos-tab-cart" onClick={() => { document.getElementById('pos-products')!.style.display='none'; document.getElementById('pos-cart')!.style.display='block'; document.getElementById('pos-tab-cart')!.style.background='var(--primary)'; document.getElementById('pos-tab-cart')!.style.color='#fff'; document.getElementById('pos-tab-products')!.style.background='var(--card)'; document.getElementById('pos-tab-products')!.style.color='var(--text)' }}
+          style={{ flex: 1, padding: '12px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, background: 'var(--card)', color: 'var(--text)', borderRight: '1px solid var(--border)' }}>
+          <i className="fa fa-cart-shopping" style={{ marginLeft: 6 }} />السلة {cart.length > 0 && <span style={{ background: 'var(--danger)', color: '#fff', borderRadius: '50%', padding: '2px 7px', fontSize: 11, marginRight: 4 }}>{cart.reduce((s,i)=>s+i.qty,0)}</span>}
+        </button>
+      </div>
+
       <div className="grid-2" style={{ alignItems: 'start' }}>
         {/* Product search + catalog */}
-        <div>
+        <div id="pos-products">
           <Card title="المنتجات" style={{ marginBottom: 16 }}>
             <div ref={searchRef} style={{ position: 'relative', marginBottom: 16 }}>
               <div style={{ position: 'relative' }}>
@@ -257,7 +269,7 @@ export default function DelegatePOSPage() {
             </div>
 
             {/* Quick product grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
               {warehouseProducts.slice(0, 8).map(p => (
                 <button key={p.id} type="button" onClick={() => addToCart(p)}
                   style={{
@@ -283,7 +295,7 @@ export default function DelegatePOSPage() {
         </div>
 
         {/* Cart */}
-        <div>
+        <div id="pos-cart">
           <Card title="سلة المشتريات" action={<span style={{ fontSize: 12, color: 'var(--muted)' }}>{cart.length} صنف</span>}>
             {cart.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
@@ -297,47 +309,36 @@ export default function DelegatePOSPage() {
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginBottom: 16 }}>
                   {cart.map(item => (
-                    <div key={item.productId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{fmt(item.price)} / وحدة</div>
+                    <div key={item.productId} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                      {/* Row 1: Name + total + delete */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--primary)', flexShrink: 0 }}>{fmt(item.price * item.qty)}</div>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px 8px', fontSize: 16, flexShrink: 0 }} onClick={() => removeFromCart(item.productId)}>
+                          <i className="fa fa-trash" />
+                        </button>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button className="btn btn-sm btn-outline" style={{ padding: '2px 8px', minWidth: 32, minHeight: 32 }} onClick={() => updateQty(item.productId, -1)}><i className="fa fa-minus" /></button>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={item.qty}
-                          onChange={e => {
-                            const v = e.target.value.replace(/[^0-9]/g, '')
-                            const n = parseInt(v) || 1
-                            const whItem = warehouseProducts.find(w => w.id === item.productId)
-                            const maxQty = whItem?.whQty ?? Infinity
-                            const newQty = Math.max(1, Math.min(maxQty, n))
-                            setCart(prev => prev.map(ci => ci.productId === item.productId ? { ...ci, qty: newQty } : ci))
-                          }}
-                          style={{ width: 50, textAlign: 'center', fontSize: 14, fontWeight: 800, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 2px', background: 'var(--bg)' }}
-                        />
-                        <button className="btn btn-sm btn-outline" style={{ padding: '2px 8px', minWidth: 32, minHeight: 32 }} onClick={() => updateQty(item.productId, +1)}><i className="fa fa-plus" /></button>
+                      {/* Row 2: Price + qty controls */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                          <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>السعر:</span>
+                          <input type="text" inputMode="decimal" value={item.price}
+                            onChange={e => { const n = parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0; setCart(prev => prev.map(ci => ci.productId === item.productId ? { ...ci, price: n } : ci)) }}
+                            style={{ flex: 1, maxWidth: 80, textAlign: 'center', fontSize: 13, fontWeight: 700, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 4px', background: 'var(--bg)' }}
+                          />
+                          <span style={{ fontSize: 11, color: 'var(--muted)' }}>ر.س</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <button style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => updateQty(item.productId, -1)}>−</button>
+                          <input type="text" inputMode="decimal" value={item.qty}
+                            onChange={e => { const n = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 1; const maxQty = warehouseProducts.find(w => w.id === item.productId)?.whQty ?? Infinity; setCart(prev => prev.map(ci => ci.productId === item.productId ? { ...ci, qty: Math.max(1, Math.min(maxQty, n)) } : ci)) }}
+                            style={{ width: 44, textAlign: 'center', fontSize: 15, fontWeight: 800, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 4px', background: 'var(--bg)' }}
+                          />
+                          <button style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => updateQty(item.productId, +1)}>+</button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={item.price}
-                          onChange={e => {
-                            const v = e.target.value.replace(/[^0-9.]/g, '')
-                            const n = v === '' ? 0 : parseFloat(v)
-                            setCart(prev => prev.map(ci => ci.productId === item.productId ? { ...ci, price: n } : ci))
-                          }}
-                          style={{ width: 80, textAlign: 'center', fontSize: 13, fontWeight: 700, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 2px', background: 'var(--bg)' }}
-                        />
-                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>ر.س</span>
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 13, minWidth: 80, textAlign: 'left' }}>{fmt(item.price * item.qty)}</div>
-                      <button className="btn btn-sm btn-outline" style={{ padding: '2px 8px', color: 'var(--danger)', minWidth: 32, minHeight: 32 }} onClick={() => removeFromCart(item.productId)}>
-                        <i className="fa fa-trash" />
-                      </button>
                     </div>
                   ))}
                 </div>

@@ -235,7 +235,7 @@ export default function DelegatePage() {
         }
       />
 
-      <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
+      <div className="stats-grid mb-6">
         <StatCard label="مبيعاتي" value={fmt(totalSales)} badge="▲" badgeType="success" dark icon="fa-dollar-sign" />
         <StatCard label="مشترياتي" value={fmt(totalPurchases)} icon="fa-shopping-cart" iconColor="var(--blue)" />
         <StatCard label="العهدة المالية" value={fmt(totalSales - totalPurchases)} icon="fa-balance-scale" iconColor="var(--primary)" />
@@ -259,30 +259,46 @@ export default function DelegatePage() {
       {tab === 'overview' && (
         <div className="grid-2">
           <Card title="آخر الفواتير" action={<button className="btn btn-sm btn-outline" onClick={() => setTab('invoices')}>عرض الكل</button>}>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>الطرف</th><th>المبلغ</th><th>الحالة</th></tr></thead>
-                <tbody>
-                  {delegateInvoices.slice(0, 5).map((inv: any) => {
-                    const st = INV_STATUS[inv.status] || { label: inv.status, css: '' }
-                    return (
-                      <tr key={inv.id}>
-                        <td>
-                          <button onClick={() => navigate(`/delegate/invoices/${inv.id}`)}
-                            style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                            {inv.number}
-                          </button>
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(inv.date)}</td>
-                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: inv.type === 'sale' ? 'var(--success-bg)' : 'var(--blue-light)', color: inv.type === 'sale' ? 'var(--success)' : 'var(--blue)' }}>{inv.type === 'sale' ? 'بيع' : 'شراء'}</span></td>
-                        <td style={{ fontWeight: 600, fontSize: 13 }}>{inv.party}</td>
-                        <td style={{ fontWeight: 700 }}>{fmt(inv.total)}</td>
-                        <td><span className={`status ${st.css}`}>{st.label}</span></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            {/* Desktop */}
+            <div className="desktop-only">
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>الرقم</th><th>النوع</th><th>الطرف</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+                  <tbody>
+                    {delegateInvoices.slice(0, 5).map((inv: any) => {
+                      const st = INV_STATUS[inv.status] || { label: inv.status, css: '' }
+                      return (
+                        <tr key={inv.id}>
+                          <td><button onClick={() => navigate(`/delegate/invoices/${inv.id}`)} style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>{inv.number}</button></td>
+                          <td><span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: inv.type === 'sale' ? 'var(--success-bg)' : 'var(--blue-light)', color: inv.type === 'sale' ? 'var(--success)' : 'var(--blue)' }}>{inv.type === 'sale' ? 'بيع' : 'شراء'}</span></td>
+                          <td style={{ fontWeight: 600, fontSize: 13 }}>{inv.party}</td>
+                          <td style={{ fontWeight: 700 }}>{fmt(inv.total)}</td>
+                          <td><span className={`status ${st.css}`}>{st.label}</span></td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {/* Mobile */}
+            <div className="mobile-card-list">
+              {delegateInvoices.slice(0, 5).map((inv: any) => {
+                const st = INV_STATUS[inv.status] || { label: inv.status, css: '' }
+                return (
+                  <div key={inv.id} className="mobile-card" onClick={() => navigate(`/delegate/invoices/${inv.id}`)}>
+                    <div className="mobile-card-row">
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--blue)' }}>{inv.number}</span>
+                      <span className={`status ${st.css}`}>{st.label}</span>
+                    </div>
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">{inv.party}</span>
+                      <span className="mobile-card-value">{fmt(inv.total)}</span>
+                    </div>
+                  </div>
+                )
+              })}
+              {delegateInvoices.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>لا توجد فواتير</div>}
             </div>
           </Card>
           <Card title="مستودعي" action={<button className="btn btn-sm btn-outline" onClick={() => setTab('warehouse')}>عرض الكل</button>}>
@@ -324,41 +340,58 @@ export default function DelegatePage() {
             </div>
           </div>
           <Card title="فواتيري">
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>الطرف</th><th>الأصناف</th><th>الإجمالي</th><th>الحالة</th><th>إجراء</th></tr></thead>
-                <tbody>
-                  {filteredInvoices.map((inv: any) => {
-                    const st = INV_STATUS[inv.status] || { label: inv.status, css: '' }
-                    return (
-                      <tr key={inv.id}>
-                        <td>
-                          <button onClick={() => navigate(`/delegate/invoices/${inv.id}`)}
-                            style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                            {inv.number}
-                          </button>
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(inv.date)}</td>
-                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: inv.type === 'sale' ? 'var(--success-bg)' : 'var(--blue-light)', color: inv.type === 'sale' ? 'var(--success)' : 'var(--blue)' }}>{inv.type === 'sale' ? 'بيع' : 'شراء'}</span></td>
-                        <td style={{ fontWeight: 600, fontSize: 13 }}>{inv.party}</td>
-                        <td style={{ fontSize: 12 }}>{inv.items?.length || 0} صنف</td>
-                        <td style={{ fontWeight: 700 }}>{fmt(inv.total)}</td>
-                        <td><span className={`status ${st.css}`}>{st.label}</span></td>
-                        <td>
-                          {inv.status === 'pending' && (
-                            <button className="btn btn-sm btn-primary" onClick={() => handleConfirmInvoice(inv.id)}>
-                              <i className="fa fa-check" /> تأكيد
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {filteredInvoices.length === 0 && (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>لا توجد فواتير</td></tr>
-                  )}
-                </tbody>
-              </table>
+            {/* Desktop */}
+            <div className="desktop-only">
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>الطرف</th><th>الإجمالي</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                  <tbody>
+                    {filteredInvoices.map((inv: any) => {
+                      const st = INV_STATUS[inv.status] || { label: inv.status, css: '' }
+                      return (
+                        <tr key={inv.id}>
+                          <td><button onClick={() => navigate(`/delegate/invoices/${inv.id}`)} style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>{inv.number}</button></td>
+                          <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(inv.date)}</td>
+                          <td><span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: inv.type === 'sale' ? 'var(--success-bg)' : 'var(--blue-light)', color: inv.type === 'sale' ? 'var(--success)' : 'var(--blue)' }}>{inv.type === 'sale' ? 'بيع' : 'شراء'}</span></td>
+                          <td style={{ fontWeight: 600, fontSize: 13 }}>{inv.party}</td>
+                          <td style={{ fontWeight: 700 }}>{fmt(inv.total)}</td>
+                          <td><span className={`status ${st.css}`}>{st.label}</span></td>
+                          <td>{inv.status === 'pending' && <button className="btn btn-sm btn-primary" onClick={() => handleConfirmInvoice(inv.id)}><i className="fa fa-check" /> تأكيد</button>}</td>
+                        </tr>
+                      )
+                    })}
+                    {filteredInvoices.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>لا توجد فواتير</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {/* Mobile */}
+            <div className="mobile-card-list">
+              {filteredInvoices.map((inv: any) => {
+                const st = INV_STATUS[inv.status] || { label: inv.status, css: '' }
+                return (
+                  <div key={inv.id} className="mobile-card">
+                    <div className="mobile-card-row">
+                      <button onClick={() => navigate(`/delegate/invoices/${inv.id}`)} style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13 }}>{inv.number}</button>
+                      <span className={`status ${st.css}`}>{st.label}</span>
+                    </div>
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">{inv.party}</span>
+                      <span className="mobile-card-value">{fmt(inv.total)}</span>
+                    </div>
+                    <div className="mobile-card-row">
+                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>{fmtDate(inv.date)}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: inv.type === 'sale' ? 'var(--success-bg)' : 'var(--blue-light)', color: inv.type === 'sale' ? 'var(--success)' : 'var(--blue)' }}>{inv.type === 'sale' ? 'بيع' : 'شراء'}</span>
+                    </div>
+                    {inv.status === 'pending' && (
+                      <button className="btn btn-sm btn-primary w-full" style={{ marginTop: 8, justifyContent: 'center' }} onClick={() => handleConfirmInvoice(inv.id)}>
+                        <i className="fa fa-check" /> تأكيد التسليم
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              {filteredInvoices.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>لا توجد فواتير</div>}
             </div>
           </Card>
         </>
@@ -366,30 +399,53 @@ export default function DelegatePage() {
 
       {tab === 'warehouse' && (
         <Card title="مستودعي">
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>الصنف</th><th>الكود</th><th>الكمية</th><th>سعر التكلفة</th><th>القيمة</th></tr></thead>
-              <tbody>
-                {delegateWarehouse.map((w: any) => (
-                  <tr key={w.id}>
-                    <td style={{ fontWeight: 600 }}>{w.productName}</td>
-                    <td><span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--blue)' }}>{w.productSku}</span></td>
-                    <td style={{ fontWeight: 700 }}>{fmtNum(w.qty)}</td>
-                    <td>{fmt(w.costPrice)}</td>
-                    <td style={{ fontWeight: 700 }}>{fmt(w.qty * w.costPrice)}</td>
+          {/* Desktop */}
+          <div className="desktop-only">
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>الصنف</th><th>الكود</th><th>الكمية</th><th>سعر التكلفة</th><th>القيمة</th></tr></thead>
+                <tbody>
+                  {delegateWarehouse.map((w: any) => (
+                    <tr key={w.id}>
+                      <td style={{ fontWeight: 600 }}>{w.productName}</td>
+                      <td><span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--blue)' }}>{w.productSku}</span></td>
+                      <td style={{ fontWeight: 700 }}>{fmtNum(w.qty)}</td>
+                      <td>{fmt(w.costPrice)}</td>
+                      <td style={{ fontWeight: 700 }}>{fmt(w.qty * w.costPrice)}</td>
+                    </tr>
+                  ))}
+                  {delegateWarehouse.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
+                    <td colSpan={4}>الإجمالي</td>
+                    <td>{fmt(whTotal)}</td>
                   </tr>
-                ))}
-                {delegateWarehouse.length === 0 && (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>
-                )}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
-                  <td colSpan={4}>الإجمالي</td>
-                  <td>{fmt(whTotal)}</td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          {/* Mobile */}
+          <div className="mobile-card-list">
+            {delegateWarehouse.map((w: any) => (
+              <div key={w.id} className="mobile-card">
+                <div className="mobile-card-row">
+                  <span style={{ fontWeight: 700 }}>{w.productName}</span>
+                  <span className="mobile-card-value">{fmtNum(w.qty)} قطعة</span>
+                </div>
+                <div className="mobile-card-row">
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--blue)' }}>{w.productSku}</span>
+                  <span style={{ fontWeight: 700 }}>{fmt(w.qty * w.costPrice)}</span>
+                </div>
+              </div>
+            ))}
+            {delegateWarehouse.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</div>}
+            {delegateWarehouse.length > 0 && (
+              <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 8, marginTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                <span>الإجمالي</span>
+                <span>{fmt(whTotal)}</span>
+              </div>
+            )}
           </div>
         </Card>
       )}
@@ -405,7 +461,7 @@ export default function DelegatePage() {
         return (
           <>
             {/* العهدة المالية */}
-            <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+            <div className="stats-grid mb-6">
               <div className="stat-card dark">
                 <div className="stat-label">العهدة المالية</div>
                 <div className="stat-value">{fmt(custody)}</div>
@@ -488,8 +544,10 @@ export default function DelegatePage() {
 
       {/* New Invoice Modal */}
       {showNewInvoice && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)', padding: 20 }}>
-          <div style={{ background: 'var(--card)', borderRadius: 16, width: '100%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.2)', border: '1px solid var(--border)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)', padding: 0 }}
+          className="modal-overlay-mobile">
+          <div style={{ background: 'var(--card)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 700, maxHeight: '95vh', overflowY: 'auto', boxShadow: '0 -8px 32px rgba(0,0,0,.2)', border: '1px solid var(--border)' }}
+            className="modal-sheet-mobile">
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 16, fontWeight: 800 }}>فاتورة جديدة</div>
               <button className="btn btn-sm btn-outline" onClick={() => setShowNewInvoice(false)}><i className="fa fa-times" /></button>
@@ -537,14 +595,22 @@ export default function DelegatePage() {
                   <button className="btn btn-sm btn-outline" onClick={handleAddItem}><i className="fa fa-plus" /> إضافة صنف</button>
                 </div>
                 {newItems.map((it, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 36px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <div style={{ position: 'relative' }}>
+                  <div key={idx} style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ position: 'relative', marginBottom: 8 }}>
                       <input className="form-control" value={it.desc} placeholder="اضغط لاختيار المنتج..." readOnly onClick={() => { setActiveItemIdx(idx); setProductSearch(''); setShowProductPicker(true) }} style={{ cursor: 'pointer', paddingLeft: 36 }} />
                       <i className="fa fa-box" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
                     </div>
-                    <input className="form-control" type="text" inputMode="decimal" value={it.qty} onChange={e => handleUpdateItem(idx, 'qty', e.target.value.replace(/[^0-9]/g, '') || '0')} placeholder="الكمية" />
-                    <input className="form-control" type="text" inputMode="decimal" value={it.price} onChange={e => handleUpdateItem(idx, 'price', e.target.value.replace(/[^0-9.]/g, '') || '0')} placeholder="السعر" />
-                    <button className="btn btn-sm btn-outline" style={{ padding: '6px 0' }} onClick={() => handleRemoveItem(idx)}><i className="fa fa-trash" style={{ color: 'var(--danger)' }} /></button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>الكمية</label>
+                        <input className="form-control" type="text" inputMode="decimal" value={it.qty} onChange={e => handleUpdateItem(idx, 'qty', e.target.value.replace(/[^0-9]/g, '') || '0')} placeholder="الكمية" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>السعر</label>
+                        <input className="form-control" type="text" inputMode="decimal" value={it.price} onChange={e => handleUpdateItem(idx, 'price', e.target.value.replace(/[^0-9.]/g, '') || '0')} placeholder="السعر" />
+                      </div>
+                      <button className="btn btn-sm btn-outline" style={{ marginTop: 18, padding: '8px 12px' }} onClick={() => handleRemoveItem(idx)}><i className="fa fa-trash" style={{ color: 'var(--danger)' }} /></button>
+                    </div>
                   </div>
                 ))}
                 {newItems.length === 0 && (

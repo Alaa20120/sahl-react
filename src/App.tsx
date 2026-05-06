@@ -13,8 +13,8 @@ const InvoiceNew       = lazy(() => import('@/modules/erp/invoices/InvoiceNewPag
 const Templates        = lazy(() => import('@/modules/erp/templates/TemplatesPage'))
 const Customers        = lazy(() => import('@/modules/erp/customers/CustomersPage'))
 const Inventory        = lazy(() => import('@/modules/erp/inventory/InventoryPage'))
+const ProductDetail    = lazy(() => import('@/modules/erp/inventory/ProductDetailPage'))
 const HR               = lazy(() => import('@/modules/erp/hr/HRPage'))
-const CRM              = lazy(() => import('@/modules/erp/crm/CRMPage'))
 
 // ERP finance
 const Treasury         = lazy(() => import('@/modules/erp/treasury/TreasuryPage'))
@@ -22,26 +22,35 @@ const Expenses         = lazy(() => import('@/modules/erp/expenses/ExpensesPage'
 const Purchases        = lazy(() => import('@/modules/erp/purchases/PurchasesPage'))
 const PurchaseDetail   = lazy(() => import('@/modules/erp/purchases/PurchaseDetailPage'))
 const Budget           = lazy(() => import('@/modules/erp/budget/BudgetPage'))
-const FixedAssets      = lazy(() => import('@/modules/erp/fixed-assets/FixedAssetsPage'))
+
 
 // ERP analytics & reports
 const Reports            = lazy(() => import('@/modules/erp/reports/ReportsPage'))
 const FinancialReports   = lazy(() => import('@/modules/erp/financial-reports/FinancialReportsPage'))
 const Analytics          = lazy(() => import('@/modules/erp/analytics/AnalyticsPage'))
+const Insights           = lazy(() => import('@/modules/erp/insights/InsightsPage'))
 const AccountStatement   = lazy(() => import('@/modules/erp/account-statement/AccountStatementPage'))
 const ZATCA              = lazy(() => import('@/modules/erp/zatca/ZATCAPage'))
 
 // ERP operations
-const POS              = lazy(() => import('@/modules/erp/pos/POSPage'))
 
 // ERP system
-const Users            = lazy(() => import('@/modules/erp/users/UsersPage'))
+
 const Settings         = lazy(() => import('@/modules/erp/settings/SettingsPage'))
 const Help             = lazy(() => import('@/modules/erp/help/HelpPage'))
 
 // Other modules
-const AdminDashboard   = lazy(() => import('@/modules/admin/AdminDashboard'))
-const DelegatePage     = lazy(() => import('@/modules/delegate/DelegatePage'))
+const AdminDashboard      = lazy(() => import('@/modules/admin/AdminDashboard'))
+const DelegatePage        = lazy(() => import('@/modules/delegate/DelegatePage'))
+const DelegateInvoices    = lazy(() => import('@/modules/delegate/DelegateInvoicesPage'))
+const DelegateWarehouse   = lazy(() => import('@/modules/delegate/DelegateWarehousePage'))
+const DelegateCustomers   = lazy(() => import('@/modules/delegate/DelegateCustomersPage'))
+const DelegateSettings    = lazy(() => import('@/modules/delegate/DelegateSettingsPage'))
+const DelegatePOS         = lazy(() => import('@/modules/delegate/DelegatePOSPage'))
+const DelegateInvoiceDetail = lazy(() => import('@/modules/delegate/DelegateInvoiceDetailPage'))
+const DelegatesListPage   = lazy(() => import('@/modules/erp/delegates/DelegatesListPage'))
+const DelegateDetailPage  = lazy(() => import('@/modules/erp/delegates/DelegateDetailPage'))
+const CustomersBalance    = lazy(() => import('@/modules/erp/customers/CustomersBalancePage'))
 
 const Loader = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--muted)', fontSize: 14, gap: 12 }}>
@@ -61,8 +70,8 @@ export default function App() {
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* ERP — محمي بتسجيل الدخول */}
-        <Route path="/erp" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+        {/* ERP — محمي بتسجيل الدخول (admin & staff only) */}
+        <Route path="/erp" element={<ProtectedRoute allowedRoles={['admin', 'accountant', 'cashier', 'hr', 'readonly']}><AppShell /></ProtectedRoute>}>
           <Route index element={<Navigate to="/erp/dashboard" replace />} />
           <Route path="dashboard"          element={S(Dashboard)} />
           <Route path="invoices"           element={S(Invoices)} />
@@ -70,37 +79,44 @@ export default function App() {
           <Route path="invoices/:id"       element={S(InvoiceDetail)} />
           <Route path="customers"          element={S(Customers)} />
           <Route path="inventory"          element={S(Inventory)} />
+          <Route path="inventory/:id"      element={S(ProductDetail)} />
           <Route path="hr"                 element={S(HR)} />
-          <Route path="crm"                element={S(CRM)} />
+
           <Route path="treasury"           element={S(Treasury)} />
           <Route path="expenses"           element={S(Expenses)} />
           <Route path="purchases"          element={S(Purchases)} />
           <Route path="purchases/:id"      element={S(PurchaseDetail)} />
           <Route path="budget"             element={S(Budget)} />
-          <Route path="fixed-assets"       element={S(FixedAssets)} />
+          <Route path="insights"            element={S(Insights)} />
           <Route path="reports"            element={S(Reports)} />
           <Route path="financial-reports"  element={S(FinancialReports)} />
           <Route path="analytics"          element={S(Analytics)} />
           <Route path="account-statement"  element={S(AccountStatement)} />
           <Route path="zatca"              element={S(ZATCA)} />
-          <Route path="pos"                element={S(POS)} />
-          <Route path="users"              element={S(Users)} />
           <Route path="settings"           element={S(Settings)} />
           <Route path="help"               element={S(Help)} />
-          <Route path="delegates"          element={S(DelegatePage)} />
+          <Route path="delegates"            element={S(DelegatesListPage)} />
+          <Route path="delegates/:id"      element={S(DelegateDetailPage)} />
+          <Route path="customers-balance"  element={S(CustomersBalance)} />
           <Route path="templates"          element={S(Templates)} />
         </Route>
 
         {/* Admin portal */}
-        <Route path="/admin" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AppShell /></ProtectedRoute>}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={S(AdminDashboard)} />
         </Route>
 
         {/* Delegate portal */}
-        <Route path="/delegate" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+        <Route path="/delegate" element={<ProtectedRoute allowedRoles={['delegate']}><AppShell /></ProtectedRoute>}>
           <Route index element={<Navigate to="/delegate/home" replace />} />
-          <Route path="home" element={S(DelegatePage)} />
+          <Route path="home"       element={S(DelegatePage)} />
+          <Route path="pos"        element={S(DelegatePOS)} />
+          <Route path="invoices"   element={S(DelegateInvoices)} />
+          <Route path="invoices/:id" element={S(DelegateInvoiceDetail)} />
+          <Route path="warehouse"  element={S(DelegateWarehouse)} />
+          <Route path="customers"  element={S(DelegateCustomers)} />
+          <Route path="settings"   element={S(DelegateSettings)} />
         </Route>
 
         <Route path="*" element={

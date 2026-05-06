@@ -83,7 +83,7 @@ export default function ZATCAPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{vp.period}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>تاريخ الاستحقاق: {vp.dueDate}</div>
+                  {vp.dueDate && <div style={{ fontSize: 12, color: 'var(--muted)' }}>تاريخ الاستحقاق: {vp.dueDate}</div>}
                 </div>
                 <div style={{ textAlign: 'center', minWidth: 100 }}>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>ضريبة محصلة</div>

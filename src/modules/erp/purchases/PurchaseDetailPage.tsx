@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import Modal from '@/components/ui/Modal'
 import { fmt, fmtDate } from '@/lib/format'
-import { PURCHASES, type PurchaseStatus } from '@/lib/mock-data/purchases'
+import { type PurchaseStatus, type Purchase } from '@/lib/mock-data/purchases'
+import { usePurchaseStore } from '@/store/purchase.store'
+import { useInventoryStore } from '@/store/inventory.store'
 import { toast } from '@/lib/toast'
 
 type TplId = 'classic' | 'modern' | 'clean' | 'minimal' | 'bold'
@@ -33,7 +35,7 @@ const TEMPLATES: { id: TplId; name: string; headerBg: string; headerColor: strin
 ]
 
 function openPrintWindow(
-  po: typeof PURCHASES[0],
+  po: Purchase,
   status: PurchaseStatus,
   tpl: typeof TEMPLATES[0],
   isVoided: boolean,
@@ -104,7 +106,7 @@ ${isVoided ? '<div class="voided-stamp">مسترجع — VOIDED</div>' : ''}
       <div class="po-meta">
         <div><strong style="opacity:.6;font-weight:600">رقم الأمر:</strong> ${po.id}</div>
         <div><strong style="opacity:.6;font-weight:600">تاريخ الإصدار:</strong> ${po.date}</div>
-        <div><strong style="opacity:.6;font-weight:600">تاريخ الاستحقاق:</strong> ${po.dueDate}</div>
+        ${po.dueDate ? `<div><strong style="opacity:.6;font-weight:600">تاريخ الاستحقاق:</strong> ${po.dueDate}</div>` : ''}
         <div><strong style="opacity:.6;font-weight:600">الحالة:</strong> ${STATUS_LABELS[status]}${isVoided ? ' — مسترجع' : ''}</div>
       </div>
     </div>
@@ -144,7 +146,7 @@ ${isVoided ? '<div class="voided-stamp">مسترجع — VOIDED</div>' : ''}
         </tr>
       </thead>
       <tbody>
-        ${po.lineItems.map((it, i) => `
+        ${po.lineItems.map((it: { description: string; qty: number; price: number; total: number }, i: number) => `
           <tr>
             <td style="color:#9CA3AF;font-size:11px;text-align:center">${i + 1}</td>
             <td style="font-weight:600">${it.description}</td>
@@ -195,7 +197,11 @@ ${isVoided ? '<div class="voided-stamp">مسترجع — VOIDED</div>' : ''}
 export default function PurchaseDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const po = PURCHASES.find(p => p.id === id)
+  const purchases = usePurchaseStore(s => s.purchases)
+  const storeAddPayment = usePurchaseStore(s => s.addPayment)
+  const confirmReceipt = usePurchaseStore(s => s.confirmReceipt)
+  const addStock = useInventoryStore(s => s.addStock)
+  const po = purchases.find(p => p.id === id)
 
   const [template, setTemplate]       = useState<TplId>(getTemplate)
   const [showPayment, setShowPayment] = useState(false)
@@ -226,10 +232,20 @@ export default function PurchaseDetailPage() {
   const handlePayment = () => {
     if (!payAmount) { toast('يرجى إدخال المبلغ', 'warn'); return }
     const amt = Math.min(+payAmount, remaining)
+    storeAddPayment(po.id, amt)
     const newPaid = po.paid + amt
     setStatus(newPaid >= po.total ? 'received' : 'partial')
     toast(`تم تسجيل دفعة ${fmt(amt)} بنجاح`, 'success')
     setShowPayment(false); setPayAmount('')
+  }
+
+  const handleConfirmReceipt = () => {
+    confirmReceipt(po.id)
+    po.lineItems.forEach(item => {
+      if (item.productId) addStock(item.productId, item.qty)
+    })
+    setStatus('received')
+    toast('تم تأكيد الاستلام وإضافة الكميات للمخزون', 'success')
   }
 
   const handleVoid = () => {
@@ -287,6 +303,11 @@ export default function PurchaseDetailPage() {
           </span>
         )}
 
+        {status === 'pending' && !isVoided && (
+          <button className="btn btn-sm btn-primary" onClick={handleConfirmReceipt}>
+            <i className="fa fa-check-double" /> تأكيد الاستلام وإضافة للمخزون
+          </button>
+        )}
         {remaining > 0 && !isVoided && status !== 'cancelled' && (
           <button className="btn btn-sm" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} onClick={() => setShowPayment(true)}>
             <i className="fa fa-coins" /> تسجيل دفعة
@@ -368,7 +389,7 @@ export default function PurchaseDetailPage() {
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: 2, opacity: .9 }}>
                 <div><strong style={{ opacity: .6, fontWeight: 600 }}>رقم الأمر:</strong> {po.id}</div>
                 <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الإصدار:</strong> {fmtDate(new Date(po.date))}</div>
-                <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الاستحقاق:</strong> {fmtDate(new Date(po.dueDate))}</div>
+                {po.dueDate && <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الاستحقاق:</strong> {fmtDate(new Date(po.dueDate))}</div>}
               </div>
             </div>
           </div>
@@ -382,6 +403,12 @@ export default function PurchaseDetailPage() {
                 <div style={{ fontWeight: 800, fontSize: 15 }}>{po.supplier}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>المملكة العربية السعودية</div>
                 {po.supplierVat && <div style={{ fontSize: 12, color: 'var(--muted)' }}>الرقم الضريبي: {po.supplierVat}</div>}
+                {po.createdBy && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>المسؤول: </span>
+                    <span style={{ fontWeight: 700 }}>{po.createdBy}</span>
+                  </div>
+                )}
               </div>
               <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: tpl.accentColor, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>حالة السداد</div>

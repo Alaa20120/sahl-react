@@ -1,10 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import PageHeader from '@/components/ui/PageHeader'
 import Card from '@/components/ui/Card'
-import { MONTHLY_DATA } from '@/lib/mock-data/dashboard'
 import RevenueChart from '@/components/charts/RevenueChart'
 import LineAreaChart from '@/components/charts/LineAreaChart'
 import { toast } from '@/lib/toast'
+import { useInvoiceStore } from '@/store/invoice.store'
+import { useExpenseStore } from '@/store/expense.store'
+import { usePurchaseStore } from '@/store/purchase.store'
+import { useInventoryStore } from '@/store/inventory.store'
+import { useTreasuryStore } from '@/store/treasury.store'
+import { useDelegateStore } from '@/store/delegate.store'
+import { useHRStore } from '@/store/hr.store'
 
 type RptTpl = 'formal' | 'modern' | 'clean' | 'compact' | 'bold'
 
@@ -269,13 +275,6 @@ const REPORT_GROUPS = [
   },
 ]
 
-const KPI_DATA = [
-  { label: 'هامش الربح الإجمالي', value: '65.5%',  change: +2.1, icon: 'fa-percent',             color: '#10B981' },
-  { label: 'متوسط قيمة الفاتورة', value: '18,420', change: +8.4, icon: 'fa-file-invoice',        color: '#2563EB' },
-  { label: 'معدل تحصيل الديون',   value: '78.2%',  change: -1.2, icon: 'fa-hand-holding-dollar', color: '#D97706' },
-  { label: 'نسبة المصروفات',      value: '34.5%',  change: -3.1, icon: 'fa-receipt',              color: '#7C3AED' },
-]
-
 const PERIOD_LABEL: Record<string, string> = {
   'هذا الشهر': 'أبريل 2025',
   'ربع السنة': 'الربع الثاني 2025',
@@ -440,10 +439,235 @@ export default function ReportsPage() {
   const [rptTpl, setRptTpl]   = useState<RptTpl>('formal')
   const [showTplPicker, setShowTplPicker] = useState(false)
 
+  const invoices = useInvoiceStore(s => s.invoices)
+  const expenses = useExpenseStore(s => s.expenses)
+  const purchases = usePurchaseStore(s => s.purchases)
+  const products = useInventoryStore(s => s.products)
+  const accounts = useTreasuryStore(s => s.accounts)
+  const delegates = useDelegateStore(s => s.delegates)
+  const employees = useHRStore(s => s.employees)
+
+  // ── Real computed data ────────────────────────────────────────────────────
+  const d = useMemo(() => {
+    const paid = invoices.filter(i => i.status !== 'draft')
+    const totalRevenue = paid.reduce((s, i) => s + i.amount, 0)
+    const paidRevenue = paid.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0)
+    const pendingRevenue = paid.filter(i => i.status === 'pending').reduce((s, i) => s + i.total, 0)
+    const overdueRevenue = paid.filter(i => i.status === 'overdue').reduce((s, i) => s + i.total, 0)
+    const totalTax = paid.reduce((s, i) => s + i.tax, 0)
+    const delegateRevenue = delegates.reduce((s, del) => s + del.invoices.filter(i => i.type === 'sale').reduce((ss, i) => ss + i.subtotal, 0), 0)
+    const delegateTax = delegates.reduce((s, del) => s + del.invoices.filter(i => i.type === 'sale').reduce((ss, i) => ss + i.tax, 0), 0)
+    const totalPurchases = purchases.reduce((s, p) => s + p.amount, 0)
+    const purchaseTax = purchases.reduce((s, p) => s + (p.tax ?? Math.round((p.total - p.amount) * 10) / 10), 0)
+    const approvedExp = expenses.filter(e => e.status === 'approved')
+    const totalExpenses = approvedExp.reduce((s, e) => s + e.amount, 0)
+    const inventoryValue = products.reduce((s, p) => s + p.stock * p.costPrice, 0)
+    const cashBalance = accounts.reduce((s, a) => s + a.balance, 0)
+    const grossProfit = totalRevenue + delegateRevenue - totalPurchases
+    const operatingProfit = grossProfit - totalExpenses
+    const vatOut = totalTax + delegateTax
+    const vatNet = Math.max(0, vatOut - purchaseTax)
+    // Top customers
+    const custMap: Record<string, { name: string; total: number }> = {}
+    paid.forEach(inv => {
+      const k = inv.customerId || inv.customer
+      if (!custMap[k]) custMap[k] = { name: inv.customer, total: 0 }
+      custMap[k].total += inv.total
+    })
+    const topCust = Object.values(custMap).sort((a, b) => b.total - a.total).slice(0, 5)
+    // Top products
+    const prodMap: Record<string, { name: string; total: number }> = {}
+    paid.forEach(inv => inv.items.forEach(it => {
+      const k = it.productId || it.description
+      if (!prodMap[k]) prodMap[k] = { name: it.description, total: 0 }
+      prodMap[k].total += it.total
+    }))
+    const topProd = Object.values(prodMap).sort((a, b) => b.total - a.total).slice(0, 5)
+    // Top vendors
+    const vendMap: Record<string, number> = {}
+    purchases.forEach(p => { vendMap[(p as any).vendor ?? p.supplier ?? 'غير محدد'] = (vendMap[(p as any).vendor ?? p.supplier ?? 'غير محدد'] ?? 0) + p.amount })
+    const topVend = Object.entries(vendMap).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    // Expense categories
+    const expCat: Record<string, number> = {}
+    approvedExp.forEach(e => { expCat[e.category ?? e.description] = (expCat[e.category ?? e.description] ?? 0) + e.amount })
+    const topExpCat = Object.entries(expCat).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    // Purchases by status
+    const poReceived = purchases.filter(p => p.status === 'received').reduce((s, p) => s + p.total, 0)
+    const poPending = purchases.filter(p => p.status === 'pending' || p.status === 'partial').reduce((s, p) => s + p.total, 0)
+    // Salaries
+    const totalSalaries = employees.filter(e => e.status === 'active').reduce((s, e) => s + ((e as any).salary ?? 0), 0)
+    const activeEmp = employees.filter(e => e.status === 'active').length
+    return {
+      totalRevenue, delegateRevenue, paidRevenue, pendingRevenue, overdueRevenue,
+      totalTax, delegateTax, vatOut, vatNet,
+      totalPurchases, purchaseTax, poReceived, poPending,
+      totalExpenses, inventoryValue, cashBalance,
+      grossProfit, operatingProfit,
+      topCust, topProd, topVend, topExpCat,
+      totalSalaries, activeEmp,
+    }
+  }, [invoices, expenses, purchases, products, accounts, delegates, employees])
+
+  // ── Real monthly chart data ───────────────────────────────────────────────
+  const monthlyData = useMemo(() => {
+    const months: Record<string, { month: string; revenue: number; expenses: number }> = {}
+    invoices.filter(i => i.status !== 'draft').forEach(i => {
+      const k = i.date.slice(0, 7)
+      if (!months[k]) months[k] = { month: k, revenue: 0, expenses: 0 }
+      months[k].revenue += i.amount
+    })
+    delegates.forEach(del => del.invoices.filter(i => i.type === 'sale').forEach(i => {
+      const k = i.date.slice(0, 7)
+      if (!months[k]) months[k] = { month: k, revenue: 0, expenses: 0 }
+      months[k].revenue += i.subtotal
+    }))
+    expenses.filter(e => e.status === 'approved').forEach(e => {
+      const k = e.date.slice(0, 7)
+      if (!months[k]) months[k] = { month: k, revenue: 0, expenses: 0 }
+      months[k].expenses += e.amount
+    })
+    return Object.values(months)
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map(r => ({ ...r, month: new Date(r.month + '-01').toLocaleDateString('ar-SA', { month: 'short', year: '2-digit' }) }))
+      .slice(-12)
+  }, [invoices, expenses, delegates])
+
+  // ── Real REPORT_GROUPS ────────────────────────────────────────────────────
+  const reportGroups = useMemo(() => [
+    {
+      title: 'التقارير المالية', icon: 'fa-chart-line', color: '#2563EB',
+      reports: [
+        { icon: 'fa-file-invoice-dollar', label: 'قائمة الدخل', desc: 'الإيرادات والمصروفات وصافي الربح',
+          data: [
+            { label: 'إجمالي الإيرادات',  value: d.totalRevenue + d.delegateRevenue, type: 'credit' },
+            { label: 'تكلفة المبيعات',    value: d.totalPurchases, type: 'debit' },
+            { label: 'إجمالي الربح',      value: d.grossProfit, type: 'total' },
+            { label: 'مصروفات التشغيل',   value: d.totalExpenses, type: 'debit' },
+            { label: 'صافي الربح',        value: d.operatingProfit, type: 'grand' },
+          ] },
+        { icon: 'fa-scale-balanced', label: 'الميزانية العمومية', desc: 'الأصول والخصوم وحقوق الملكية',
+          data: [
+            { label: 'النقد والخزينة',     value: d.cashBalance, type: 'credit' },
+            { label: 'المخزون',            value: d.inventoryValue, type: 'credit' },
+            { label: 'إجمالي الأصول',      value: d.cashBalance + d.inventoryValue, type: 'total' },
+            { label: 'الخصوم المتداولة',   value: Math.max(0, d.vatNet), type: 'debit' },
+            { label: 'حقوق الملكية',       value: d.cashBalance + d.inventoryValue - Math.max(0, d.vatNet), type: 'grand' },
+          ] },
+        { icon: 'fa-money-bill-transfer', label: 'التدفق النقدي', desc: 'حركة الأموال الواردة والصادرة',
+          data: [
+            { label: 'إيرادات محصّلة', value: d.paidRevenue, type: 'credit' },
+            { label: 'مدفوعات مصروفات', value: d.totalExpenses, type: 'debit' },
+            { label: 'مدفوعات مشتريات', value: d.totalPurchases, type: 'debit' },
+            { label: 'رصيد الخزينة', value: d.cashBalance, type: 'grand' },
+          ] },
+        { icon: 'fa-chart-pie', label: 'تحليل الإيرادات', desc: 'توزيع الإيرادات حسب المصدر',
+          data: [
+            { label: 'مبيعات مباشرة',    value: d.totalRevenue, type: 'credit' },
+            { label: 'مبيعات المناديب',  value: d.delegateRevenue, type: 'credit' },
+            { label: 'الإجمالي',         value: d.totalRevenue + d.delegateRevenue, type: 'grand' },
+          ] },
+      ],
+    },
+    {
+      title: 'تقارير المبيعات', icon: 'fa-cart-shopping', color: '#10B981',
+      reports: [
+        { icon: 'fa-file-invoice', label: 'ملخص الفواتير', desc: 'إجمالي الفواتير حسب الفترة والحالة',
+          data: [
+            { label: 'فواتير مدفوعة',  value: d.paidRevenue, type: 'credit' },
+            { label: 'فواتير معلقة',   value: d.pendingRevenue, type: 'debit' },
+            { label: 'فواتير متأخرة',  value: d.overdueRevenue, type: 'debit' },
+            { label: 'الإجمالي',       value: d.totalRevenue, type: 'grand' },
+          ] },
+        { icon: 'fa-users', label: 'مبيعات العملاء', desc: 'أداء المبيعات لكل عميل',
+          data: [
+            ...d.topCust.map(c => ({ label: c.name, value: c.total, type: 'credit' as const })),
+            { label: 'الإجمالي', value: d.totalRevenue + d.delegateRevenue, type: 'grand' as const },
+          ] },
+        { icon: 'fa-box', label: 'مبيعات المنتجات', desc: 'الأصناف الأكثر والأقل مبيعاً',
+          data: [
+            ...d.topProd.map(p => ({ label: p.name, value: p.total, type: 'credit' as const })),
+            { label: 'الإجمالي', value: d.totalRevenue, type: 'grand' as const },
+          ] },
+        { icon: 'fa-users-between-lines', label: 'مبيعات المناديب', desc: 'مقارنة أداء المناديب',
+          data: [
+            ...delegates.map(del => ({ label: del.name, value: del.stats.totalSales, type: 'credit' as const })),
+            { label: 'الإجمالي', value: d.delegateRevenue, type: 'grand' as const },
+          ] },
+      ],
+    },
+    {
+      title: 'تقارير المشتريات', icon: 'fa-shopping-cart', color: '#7C3AED',
+      reports: [
+        { icon: 'fa-industry', label: 'ملخص الموردين', desc: 'إجمالي المشتريات لكل مورد',
+          data: [
+            ...d.topVend.map(([name, val]) => ({ label: name, value: val, type: 'debit' as const })),
+            { label: 'الإجمالي', value: d.totalPurchases, type: 'grand' as const },
+          ] },
+        { icon: 'fa-receipt', label: 'تقرير المصروفات', desc: 'تصنيف وتحليل المصروفات',
+          data: [
+            ...d.topExpCat.map(([name, val]) => ({ label: name, value: val, type: 'debit' as const })),
+            { label: 'الإجمالي', value: d.totalExpenses, type: 'grand' as const },
+          ] },
+        { icon: 'fa-warehouse', label: 'حركة المخزون', desc: 'الوارد والصادر والرصيد',
+          data: [
+            { label: 'مشتريات الفترة', value: d.totalPurchases, type: 'credit' as const },
+            { label: 'قيمة المخزون الحالي', value: d.inventoryValue, type: 'grand' as const },
+          ] },
+        { icon: 'fa-truck', label: 'أوامر الشراء', desc: 'حالة وتتبع أوامر الشراء',
+          data: [
+            { label: 'أوامر منفذة',  value: d.poReceived, type: 'credit' as const },
+            { label: 'أوامر معلقة', value: d.poPending, type: 'debit' as const },
+            { label: 'الإجمالي',    value: d.totalPurchases + d.poPending, type: 'grand' as const },
+          ] },
+      ],
+    },
+    {
+      title: 'تقارير الضريبة والزكاة', icon: 'fa-shield-halved', color: '#DC2626',
+      reports: [
+        { icon: 'fa-percent', label: 'تقرير ضريبة القيمة المضافة', desc: 'الضريبة المحصلة والمدفوعة',
+          data: [
+            { label: 'ضريبة المبيعات المحصلة', value: d.vatOut, type: 'credit' as const },
+            { label: 'ضريبة المشتريات',         value: d.purchaseTax, type: 'debit' as const },
+            { label: 'صافي الضريبة المستحقة',   value: d.vatNet, type: 'grand' as const },
+          ] },
+        { icon: 'fa-file-shield', label: 'إقرار ZATCA', desc: 'إعداد الإقرار الضريبي',
+          data: [
+            { label: 'إيرادات خاضعة للضريبة', value: d.totalRevenue + d.delegateRevenue, type: 'credit' as const },
+            { label: 'مشتريات خاضعة للضريبة', value: d.totalPurchases, type: 'debit' as const },
+            { label: 'ضريبة المبيعات 15%',     value: d.vatOut, type: 'credit' as const },
+            { label: 'ضريبة المشتريات 15%',    value: d.purchaseTax, type: 'debit' as const },
+            { label: 'الضريبة المستحقة',       value: d.vatNet, type: 'grand' as const },
+          ] },
+        { icon: 'fa-clipboard-check', label: 'فاتورة إلكترونية', desc: 'تقرير الفواتير الإلكترونية',
+          data: [
+            { label: 'إجمالي الفواتير',   value: invoices.filter(i => i.status !== 'draft').length, type: 'credit' as const },
+            { label: 'فواتير مدفوعة',     value: invoices.filter(i => i.status === 'paid').length, type: 'credit' as const },
+            { label: 'فواتير معلقة',      value: invoices.filter(i => i.status === 'pending').length, type: 'debit' as const },
+          ] },
+      ],
+    },
+  ], [d, delegates, invoices])
+
+  // ── Real KPI Data ─────────────────────────────────────────────────────────
+  const kpiData = useMemo(() => {
+    const totalRev = d.totalRevenue + d.delegateRevenue
+    const grossMargin = totalRev > 0 ? Math.round(d.grossProfit / totalRev * 1000) / 10 : 0
+    const avgInvoice = invoices.filter(i => i.status !== 'draft').length > 0
+      ? Math.round(totalRev / invoices.filter(i => i.status !== 'draft').length) : 0
+    const collectionRate = d.totalRevenue > 0 ? Math.round(d.paidRevenue / (d.totalRevenue * 1.15) * 100) : 0
+    const expenseRatio = totalRev > 0 ? Math.round(d.totalExpenses / totalRev * 100) : 0
+    return [
+      { label: 'هامش الربح الإجمالي', value: `${grossMargin}%`, icon: 'fa-percent', color: '#10B981' },
+      { label: 'متوسط قيمة الفاتورة', value: avgInvoice.toLocaleString('ar-SA'), icon: 'fa-file-invoice', color: '#2563EB' },
+      { label: 'نسبة الفواتير المدفوعة', value: `${collectionRate}%`, icon: 'fa-hand-holding-dollar', color: '#D97706' },
+      { label: 'نسبة المصروفات', value: `${expenseRatio}%`, icon: 'fa-receipt', color: '#7C3AED' },
+    ]
+  }, [d, invoices])
+
   const activeTpl = RPT_TEMPLATES.find(t => t.id === rptTpl) ?? RPT_TEMPLATES[0]
 
-  const handleReport = (report: typeof REPORT_GROUPS[0]['reports'][0]) => {
-    printReport(report, period, activeTpl)
+  const handleReport = (report: { label: string; desc: string; icon: string; data: { label: string; value: number; type: string }[] }) => {
+    printReport(report as any, period, activeTpl)
     toast(`جارٍ تحضير تقرير: ${report.label}...`, 'info')
   }
 
@@ -499,7 +723,7 @@ export default function ReportsPage() {
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
-        {KPI_DATA.map(kpi => (
+        {kpiData.map(kpi => (
           <div key={kpi.label} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: kpi.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -508,8 +732,8 @@ export default function ReportsPage() {
               <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1 }}>{kpi.label}</span>
             </div>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>{kpi.value}</div>
-            <div style={{ fontSize: 12, marginTop: 4, color: kpi.change > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-              {kpi.change > 0 ? '▲' : '▼'} {Math.abs(kpi.change)}% مقارنة بالفترة السابقة
+            <div style={{ fontSize: 12, marginTop: 4, color: 'var(--muted)', fontWeight: 600 }}>
+              مقارنة بالفترة السابقة
             </div>
           </div>
         ))}
@@ -517,17 +741,17 @@ export default function ReportsPage() {
 
       {/* Charts overview */}
       <div className="grid-2 mb-6">
-        <Card title="الإيراد والمصروفات" action={<span style={{ fontSize: 12, color: 'var(--muted)' }}>{period}</span>}>
-          <RevenueChart data={MONTHLY_DATA} />
+        <Card title="الإيراد والمصروفات" action={<span style={{ fontSize: 12, color: 'var(--success)' }}>بيانات حقيقية</span>}>
+          <RevenueChart data={monthlyData} />
         </Card>
-        <Card title="نمو الإيراد" action={<span style={{ fontSize: 12, color: 'var(--muted)' }}>اتجاه تصاعدي</span>}>
-          <LineAreaChart data={MONTHLY_DATA} dataKey="revenue" label="الإيراد" color="var(--blue)" />
+        <Card title="نمو الإيراد" action={<span style={{ fontSize: 12, color: 'var(--success)' }}>بيانات حقيقية</span>}>
+          <LineAreaChart data={monthlyData} dataKey="revenue" label="الإيراد" color="var(--blue)" />
         </Card>
       </div>
 
       {/* Report groups */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {REPORT_GROUPS.map(group => (
+        {reportGroups.map(group => (
           <div key={group.title}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: group.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

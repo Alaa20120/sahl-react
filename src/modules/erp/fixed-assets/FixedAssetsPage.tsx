@@ -3,7 +3,8 @@ import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import { fmt, fmtDate } from '@/lib/format'
-import { FIXED_ASSETS, ASSET_CATEGORIES, type AssetStatus, type FixedAsset } from '@/lib/mock-data/fixed-assets'
+import { FIXED_ASSETS, ASSET_CATEGORIES, type AssetStatus, type AssetOwnership, type FixedAsset } from '@/lib/mock-data/fixed-assets'
+import { useTreasuryStore } from '@/store/treasury.store'
 import { toast } from '@/lib/toast'
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
@@ -24,7 +25,7 @@ const CAT_ICONS: Record<string, string> = {
   'معدات طباعة':    'fa-print',
 }
 
-const EMPTY_FORM = { name: '', category: 'أجهزة كمبيوتر', purchaseDate: '', cost: '', depRate: '33', location: 'الرئيسي', status: 'active' as AssetStatus, serialNumber: '' }
+const EMPTY_FORM = { name: '', category: 'أجهزة كمبيوتر', ownership: 'owned' as AssetOwnership, monthlyRent: '', purchaseDate: '', cost: '', depRate: '33', location: 'الرئيسي', status: 'active' as AssetStatus, serialNumber: '' }
 
 function buildDepSchedule(asset: FixedAsset) {
   const rows: { year: string; charge: number; accumulated: number; bookValue: number }[] = []
@@ -40,20 +41,30 @@ function buildDepSchedule(asset: FixedAsset) {
 }
 
 export default function FixedAssetsPage() {
+  const addTransaction = useTreasuryStore(s => s.addTransaction)
+  const accounts = useTreasuryStore(s => s.accounts)
+
   const [assets, setAssets]         = useState<FixedAsset[]>(FIXED_ASSETS)
   const [catFilter, setCatFilter]   = useState('الكل')
+  const [ownershipFilter, setOwnershipFilter] = useState<'all' | AssetOwnership>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | AssetStatus>('all')
   const [search, setSearch]         = useState('')
   const [viewAsset, setViewAsset]   = useState<FixedAsset | null>(null)
   const [deleteAsset, setDeleteAsset] = useState<FixedAsset | null>(null)
   const [showNew, setShowNew]       = useState(false)
   const [form, setForm]             = useState(EMPTY_FORM)
+  const [showRental, setShowRental] = useState(false)
+  const [rentalAsset, setRentalAsset] = useState<FixedAsset | null>(null)
+  const [rentalMonth, setRentalMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [rentalAmount, setRentalAmount] = useState('')
+  const [rentalAccount, setRentalAccount] = useState('cash')
 
   const filtered = assets.filter(a => {
-    const matchCat    = catFilter === 'الكل' || a.category === catFilter
-    const matchStatus = statusFilter === 'all' || a.status === statusFilter
-    const matchSearch = !search || a.name.includes(search) || a.id.includes(search)
-    return matchCat && matchStatus && matchSearch
+    const matchCat       = catFilter === 'الكل' || a.category === catFilter
+    const matchOwnership = ownershipFilter === 'all' || a.ownership === ownershipFilter
+    const matchStatus    = statusFilter === 'all' || a.status === statusFilter
+    const matchSearch    = !search || a.name.includes(search) || a.id.includes(search)
+    return matchCat && matchOwnership && matchStatus && matchSearch
   })
 
   const depPct = (a: FixedAsset) => Math.min(Math.round((a.accumulated / a.cost) * 100), 100)
@@ -82,6 +93,7 @@ export default function FixedAssetsPage() {
       id: newId,
       name: form.name.trim(),
       category: form.category,
+      ownership: form.ownership,
       purchaseDate: form.purchaseDate,
       cost,
       accumulated,
@@ -89,6 +101,7 @@ export default function FixedAssetsPage() {
       depRate,
       status: form.status,
       location: form.location || 'الرئيسي',
+      monthlyRent: form.ownership === 'rental' && form.monthlyRent ? +form.monthlyRent : undefined,
     }
     setAssets(prev => [newAsset, ...prev])
     toast(`تم إضافة الأصل "${newAsset.name}" بنجاح`, 'success')
@@ -102,6 +115,24 @@ export default function FixedAssetsPage() {
   const activeCount      = assets.filter(a => a.status === 'active').length
 
   const depSchedule = viewAsset ? buildDepSchedule(viewAsset) : []
+
+  const handleRental = () => {
+    if (!rentalAsset) return
+    const amt = parseFloat(rentalAmount)
+    if (!amt || amt <= 0) { toast('يرجى إدخال مبلغ الإيجار', 'warn'); return }
+    addTransaction({
+      date: new Date().toISOString().slice(0, 10),
+      description: `إيجار شهري — ${rentalAsset.name} (${rentalMonth})`,
+      type: 'out',
+      category: 'expense',
+      amount: amt,
+      account: rentalAccount,
+    })
+    toast(`تم خصم إيجار ${rentalAsset.name} — ${fmt(amt)} ر.س`, 'success')
+    setShowRental(false)
+    setRentalAsset(null)
+    setRentalAmount('')
+  }
 
   return (
     <>
@@ -135,6 +166,20 @@ export default function FixedAssetsPage() {
                 <button key={c} onClick={() => setCatFilter(c)} className={`btn btn-sm ${catFilter === c ? 'btn-primary' : 'btn-outline'}`}>{c}</button>
               ))}
             </div>
+            {/* Ownership filter */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {([['all','الكل'],['owned','تمليك'],['rental','إيجار']] as [typeof ownershipFilter, string][]).map(([k,v]) => (
+                <button
+                  key={k}
+                  onClick={() => setOwnershipFilter(k)}
+                  className={`btn btn-sm ${ownershipFilter === k ? 'btn-primary' : 'btn-outline'}`}
+                  style={k === 'rental' && ownershipFilter !== 'rental' ? { color: 'var(--blue)', borderColor: 'var(--blue)40' } : {}}
+                >
+                  {k === 'rental' && <i className="fa fa-key" style={{ marginLeft: 4, fontSize: 10 }} />}
+                  {v}
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {([['all','الكل'],['active','نشط'],['maintenance','صيانة'],['disposed','مُستغنى']] as [typeof statusFilter, string][]).map(([k,v]) => (
                 <button key={k} onClick={() => setStatusFilter(k)} className={`btn btn-sm ${statusFilter === k ? 'btn-primary' : 'btn-outline'}`}>{v}</button>
@@ -153,8 +198,9 @@ export default function FixedAssetsPage() {
                 <th>رقم الأصل</th>
                 <th>اسم الأصل</th>
                 <th>الفئة</th>
+                <th>النوع</th>
                 <th>تاريخ الشراء</th>
-                <th>التكلفة</th>
+                <th>التكلفة / الإيجار</th>
                 <th>مجمع الاستهلاك</th>
                 <th>القيمة الدفترية</th>
                 <th>نسبة الاستهلاك</th>
@@ -174,8 +220,19 @@ export default function FixedAssetsPage() {
                       {asset.category}
                     </span>
                   </td>
+                  <td>
+                    {asset.ownership === 'rental'
+                      ? <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--blue)15', color: 'var(--blue)', borderRadius: 6, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fa fa-key" style={{ fontSize: 9 }} />إيجار</span>
+                      : <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--success)15', color: 'var(--success)', borderRadius: 6, padding: '2px 8px' }}>تمليك</span>
+                    }
+                  </td>
                   <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(new Date(asset.purchaseDate))}</td>
-                  <td style={{ fontWeight: 700 }}>{fmt(asset.cost)}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{fmt(asset.cost)}</div>
+                    {asset.ownership === 'rental' && asset.monthlyRent && (
+                      <div style={{ fontSize: 10, color: 'var(--blue)', marginTop: 2 }}><i className="fa fa-key" style={{ marginLeft: 3, fontSize: 8 }} />{fmt(asset.monthlyRent)}/شهر</div>
+                    )}
+                  </td>
                   <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{fmt(asset.accumulated)}</td>
                   <td style={{ fontWeight: 700, color: asset.bookValue === 0 ? 'var(--muted)' : 'var(--success)' }}>{fmt(asset.bookValue)}</td>
                   <td>
@@ -197,6 +254,16 @@ export default function FixedAssetsPage() {
                       <button className="btn btn-icon btn-outline" title="عرض التفاصيل" onClick={() => setViewAsset(asset)}>
                         <i className="fa fa-eye" />
                       </button>
+                      {asset.ownership === 'rental' && (
+                        <button
+                          className="btn btn-icon btn-outline"
+                          title="دفع إيجار شهري"
+                          style={{ color: 'var(--blue)', borderColor: 'var(--blue)40' }}
+                          onClick={() => { setRentalAsset(asset); setRentalAmount(String(asset.monthlyRent ?? '')); setShowRental(true) }}
+                        >
+                          <i className="fa fa-car" />
+                        </button>
+                      )}
                       <button
                         className="btn btn-icon btn-outline"
                         title="حذف الأصل"
@@ -334,6 +401,14 @@ export default function FixedAssetsPage() {
             {/* Actions */}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setViewAsset(null)}>إغلاق</button>
+              {viewAsset.ownership === 'rental' && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => { setRentalAsset(viewAsset); setRentalAmount(String(viewAsset.monthlyRent ?? '')); setShowRental(true); setViewAsset(null) }}
+                >
+                  <i className="fa fa-car" /> دفع إيجار شهري
+                </button>
+              )}
               <button
                 className="btn btn-sm"
                 style={{ background: 'var(--danger)', color: '#fff', border: 'none' }}
@@ -385,6 +460,87 @@ export default function FixedAssetsPage() {
         )}
       </Modal>
 
+      {/* ── Vehicle Rental Modal ── */}
+      <Modal open={showRental} onClose={() => { setShowRental(false); setRentalAsset(null) }} title="دفع إيجار شهري — مركبة">
+        {rentalAsset && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Vehicle card */}
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--blue)18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fa fa-car" style={{ fontSize: 20, color: 'var(--blue)' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 14 }}>{rentalAsset.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  {rentalAsset.id} — {rentalAsset.location}
+                  {rentalAsset.monthlyRent && (
+                    <span style={{ marginRight: 8, color: 'var(--blue)', fontWeight: 700 }}>
+                      الإيجار المعتاد: {fmt(rentalAsset.monthlyRent)} ر.س/شهر
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Month */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>الشهر المراد سداده <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <input
+                className="form-control"
+                type="month"
+                value={rentalMonth}
+                onChange={e => setRentalMonth(e.target.value)}
+              />
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>مبلغ الإيجار (ر.س) <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <input
+                className="form-control"
+                type="number"
+                placeholder="0.00"
+                value={rentalAmount}
+                onChange={e => setRentalAmount(e.target.value)}
+              />
+              {rentalAsset.monthlyRent && rentalAmount !== String(rentalAsset.monthlyRent) && (
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  الإيجار المعتاد: {fmt(rentalAsset.monthlyRent)} ر.س
+                </div>
+              )}
+            </div>
+
+            {/* Account */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>الخصم من حساب</label>
+              <select className="form-control" value={rentalAccount} onChange={e => setRentalAccount(e.target.value)}>
+                {accounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.label} — الرصيد: {fmt(a.balance)} ر.س
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Info note */}
+            <div style={{ background: '#EFF6FF', border: '1px solid var(--blue)30', borderRadius: 8, padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <i className="fa fa-circle-info" style={{ color: 'var(--blue)', fontSize: 14, marginTop: 2 }} />
+              <div style={{ fontSize: 12, color: 'var(--blue)', lineHeight: 1.6 }}>
+                سيتم خصم المبلغ مباشرة من الحساب المحدد وتسجيله كمصروف إيجار في سجل الخزنة.
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleRental}>
+                <i className="fa fa-check" /> تأكيد السداد وخصم من الخزنة
+              </button>
+              <button className="btn btn-outline" onClick={() => { setShowRental(false); setRentalAsset(null) }}>إلغاء</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* ── Add New Asset Modal ── */}
       <Modal open={showNew} onClose={() => { setShowNew(false); setForm(EMPTY_FORM) }} title="إضافة أصل جديد">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -399,6 +555,40 @@ export default function FixedAssetsPage() {
                 {ASSET_CATEGORIES.filter(c => c !== 'الكل').map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
+            {/* Ownership type toggle */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 8 }}>نوع الأصل</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {([['owned','تمليك','fa-building','var(--success)'],['rental','إيجار','fa-key','var(--blue)']] as [AssetOwnership,string,string,string][]).map(([k,v,icon,color]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, ownership: k }))}
+                    style={{
+                      flex: 1, padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                      border: `2px solid ${form.ownership === k ? color : 'var(--border)'}`,
+                      background: form.ownership === k ? color + '12' : 'var(--bg)',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <i className={`fa ${icon}`} style={{ fontSize: 18, color: form.ownership === k ? color : 'var(--muted)', display: 'block', marginBottom: 4 }} />
+                    <div style={{ fontWeight: 700, fontSize: 13, color: form.ownership === k ? color : 'var(--text)' }}>{v}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {form.ownership === 'rental' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>قيمة الإيجار الشهري (ر.س) <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  className="form-control"
+                  type="number"
+                  placeholder="0.00"
+                  value={form.monthlyRent}
+                  onChange={e => setForm(f => ({ ...f, monthlyRent: e.target.value }))}
+                />
+              </div>
+            )}
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>الحالة</label>
               <select className="form-control" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as AssetStatus }))}>

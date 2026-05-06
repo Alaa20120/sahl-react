@@ -10,6 +10,7 @@ export interface AuthUser {
   role: UserRole
   company: string
   avatar?: string
+  delegateId?: string
 }
 
 interface AuthState {

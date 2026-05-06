@@ -1,0 +1,21 @@
+{
+  "name": "سهل — نظام ERP",
+  "short_name": "سهل",
+  "description": "نظام ERP عربي متكامل لإدارة الفواتير والمخزون والموارد البشرية",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0D1117",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 72x72 96x96 128x128 256x256",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

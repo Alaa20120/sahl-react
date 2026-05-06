@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import Modal from '@/components/ui/Modal'
 import ZATCAQRCode from '@/components/ui/ZATCAQRCode'
 import { fmt, fmtDate } from '@/lib/format'
-import { INVOICES, type InvoiceStatus } from '@/lib/mock-data/invoices'
+import { type Invoice, type InvoiceStatus } from '@/lib/mock-data/invoices'
+import { useInvoiceStore } from '@/store/invoice.store'
+import { useInventoryStore } from '@/store/inventory.store'
 import { toast } from '@/lib/toast'
 
 type TplId = 'classic' | 'modern' | 'clean' | 'minimal' | 'bold'
@@ -11,10 +13,10 @@ const TEMPLATE_KEY = 'sahl-inv-template'
 const getTemplate = () => (localStorage.getItem(TEMPLATE_KEY) as TplId) ?? 'classic'
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
-  paid: 'var(--success)', pending: 'var(--warn)', overdue: 'var(--danger)', draft: 'var(--muted)',
+  paid: 'var(--success)', partial: 'var(--blue)', confirmed: 'var(--primary)', pending: 'var(--warn)', overdue: 'var(--danger)', draft: 'var(--muted)',
 }
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  paid: 'مدفوع', pending: 'معلق', overdue: 'متأخر', draft: 'مسودة',
+  paid: 'مدفوع', partial: 'جزئي', confirmed: 'مؤكد', pending: 'معلق', overdue: 'متأخر', draft: 'مسودة',
 }
 
 const TEMPLATES: { id: TplId; name: string; headerBg: string; headerColor: string; accentColor: string; borderTop?: string }[] = [
@@ -26,7 +28,7 @@ const TEMPLATES: { id: TplId; name: string; headerBg: string; headerColor: strin
 ]
 
 function openPrintWindow(
-  invoice: typeof INVOICES[0],
+  invoice: Invoice,
   status: InvoiceStatus,
   tpl: typeof TEMPLATES[0],
   isVoided: boolean,
@@ -95,7 +97,7 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
       <div class="inv-meta">
         <div><strong style="opacity:.6;font-weight:600">رقم الفاتورة:</strong> ${invoice.number}</div>
         <div><strong style="opacity:.6;font-weight:600">تاريخ الإصدار:</strong> ${invoice.date}</div>
-        <div><strong style="opacity:.6;font-weight:600">تاريخ الاستحقاق:</strong> ${invoice.dueDate}</div>
+        ${invoice.dueDate ? `<div><strong style="opacity:.6;font-weight:600">تاريخ الاستحقاق:</strong> ${invoice.dueDate}</div>` : ''}
         <div><strong style="opacity:.6;font-weight:600">الحالة:</strong> ${STATUS_LABELS[status]}${isVoided ? ' — ملغاة' : ''}</div>
       </div>
     </div>
@@ -199,7 +201,9 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
 export default function InvoiceDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const invoice = INVOICES.find(i => i.id === id)
+  const { invoices, addPayment, updateStatus, confirmInvoice } = useInvoiceStore()
+  const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
+  const invoice = invoices.find(i => i.id === id)
 
   const [template, setTemplate]         = useState<TplId>(getTemplate)
   const [showPayment, setShowPayment] = useState(false)
@@ -207,7 +211,7 @@ export default function InvoiceDetailPage() {
   const [showVoid, setShowVoid]       = useState(false)
   const [payAmount, setPayAmount]     = useState('')
   const [payMethod, setPayMethod]     = useState<'cash' | 'bank' | 'card'>('bank')
-  const [status, setStatus]           = useState<InvoiceStatus>(invoice?.status ?? 'pending')
+  const status = invoice?.status ?? 'pending'
   const [isVoided, setIsVoided]       = useState(false)
   const [voidReason, setVoidReason]   = useState('')
   const [sendEmail, setSendEmail]     = useState('client@company.sa')
@@ -229,9 +233,19 @@ export default function InvoiceDetailPage() {
 
   const handlePayment = () => {
     if (!payAmount) { toast('يرجى إدخال المبلغ', 'warn'); return }
-    setStatus('paid')
-    toast(`تم تسجيل دفعة ${fmt(+payAmount)} بنجاح`, 'success')
+    const amt = parseFloat(payAmount)
+    if (amt > (invoice.total - (invoice.paidAmount || 0))) {
+      toast('المبلغ المدفوع أكبر من المتبقي!', 'warn'); return
+    }
+    addPayment(invoice.id, amt)
+    toast(`تم تسجيل دفعة ${fmt(amt)} بنجاح`, 'success')
     setShowPayment(false); setPayAmount('')
+  }
+
+  const handleConfirm = () => {
+    confirmInvoice(invoice.id)
+    deductFromInventory(invoice.items.map(it => ({ productId: it.productId, qty: it.qty })))
+    toast('تم تأكيد الفاتورة وخصم الكميات من المخزون', 'success')
   }
 
   const handleSend = () => {
@@ -242,7 +256,7 @@ export default function InvoiceDetailPage() {
   const handleVoid = () => {
     if (!voidReason.trim()) { toast('يرجى إدخال سبب الاسترجاع', 'warn'); return }
     setIsVoided(true)
-    setStatus('draft')
+    updateStatus(invoice.id, 'draft')
     toast(`تم استرجاع الفاتورة ${invoice.number}`, 'success')
     setShowVoid(false)
   }
@@ -294,7 +308,12 @@ export default function InvoiceDetailPage() {
           </span>
         )}
 
-        {status !== 'paid' && !isVoided && (
+        {(status === 'draft' || status === 'pending') && !isVoided && (
+          <button className="btn btn-sm btn-primary" onClick={handleConfirm}>
+            <i className="fa fa-check" /> تأكيد الفاتورة وخصم المخزون
+          </button>
+        )}
+        {status !== 'paid' && status !== 'draft' && status !== 'pending' && !isVoided && (
           <button className="btn btn-sm" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} onClick={() => setShowPayment(true)}>
             <i className="fa fa-coins" /> تسجيل دفعة
           </button>
@@ -382,7 +401,7 @@ export default function InvoiceDetailPage() {
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: 2, opacity: .9 }}>
                 <div><strong style={{ opacity: .6, fontWeight: 600 }}>رقم الفاتورة:</strong> {invoice.number}</div>
                 <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الإصدار:</strong> {fmtDate(new Date(invoice.date))}</div>
-                <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الاستحقاق:</strong> {fmtDate(new Date(invoice.dueDate))}</div>
+                {invoice.dueDate && <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الاستحقاق:</strong> {fmtDate(new Date(invoice.dueDate))}</div>}
               </div>
             </div>
           </div>
@@ -395,6 +414,12 @@ export default function InvoiceDetailPage() {
                 <div style={{ fontWeight: 800, fontSize: 15 }}>{invoice.customer}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>الرياض، المملكة العربية السعودية</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>الرقم الضريبي: 300000000000000</div>
+                {invoice.createdBy && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>أعدّها: </span>
+                    <span style={{ fontWeight: 700 }}>{invoice.createdBy}</span>
+                  </div>
+                )}
               </div>
               <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: tpl.accentColor, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>بيانات الدفع</div>
@@ -474,6 +499,14 @@ export default function InvoiceDetailPage() {
                     <span>الإجمالي المستحق</span>
                     <strong>{fmt(invoice.total)}</strong>
                   </div>
+                  <div className="inv-totals-row" style={{ marginTop: 8 }}>
+                    <span style={{ color: 'var(--success)' }}>المدفوع</span>
+                    <strong style={{ color: 'var(--success)' }}>{fmt(invoice.paidAmount || 0)}</strong>
+                  </div>
+                  <div className="inv-totals-row">
+                    <span>المتبقي</span>
+                    <strong>{fmt(invoice.total - (invoice.paidAmount || 0))}</strong>
+                  </div>
                 </div>
 
                 {status === 'paid' && !isVoided && (
@@ -497,12 +530,12 @@ export default function InvoiceDetailPage() {
       <Modal open={showPayment} onClose={() => setShowPayment(false)} title="تسجيل دفعة">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>المبلغ المستحق</div>
-            <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--primary)' }}>{fmt(invoice.total)}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>المبلغ المستحق (المتبقي)</div>
+            <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--primary)' }}>{fmt(invoice.total - (invoice.paidAmount || 0))}</div>
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>المبلغ المدفوع (ر.س)</label>
-            <input className="form-control" type="number" placeholder={String(invoice.total)} value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+            <input className="form-control" type="number" placeholder={String(invoice.total - (invoice.paidAmount || 0))} value={payAmount} onChange={e => setPayAmount(e.target.value)} />
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 8 }}>طريقة الدفع</label>

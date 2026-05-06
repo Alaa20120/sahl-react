@@ -1,25 +1,107 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
+import { useDelegateStore } from '@/store/delegate.store'
 import { toast } from '@/lib/toast'
 
+type LoginMode = 'admin' | 'delegate'
+
+// Admin credentials — plaintext for reliability (this is client-side only)
+const ADMIN_CREDENTIALS = [
+  { email: 'admin@company.sa', password: 'admin123', name: 'أحمد المدير', role: 'admin' as const },
+  { email: 'acc@company.sa', password: 'acc123', name: 'سارة المحاسبة', role: 'accountant' as const },
+]
+
 export default function Login() {
+  const [mode, setMode] = useState<LoginMode>('admin')
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
+  const [loginAttempts, setLoginAttempts] = useState(0)
+  const [isLocked, setIsLocked] = useState(false)
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
+  const validateDelegateLogin = useDelegateStore(s => s.validateLogin)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) { toast('يرجى إدخال البيانات', 'warn'); return }
+
+    if (isLocked) {
+      toast('تم قفل الحساب مؤقتاً — جرب بعد 5 دقائق', 'danger')
+      return
+    }
+
+    if (loginAttempts >= 5) {
+      setIsLocked(true)
+      toast('تم قفل الحساب مؤقتاً — جرب بعد 5 دقائق', 'danger')
+      setTimeout(() => {
+        setIsLocked(false)
+        setLoginAttempts(0)
+      }, 5 * 60 * 1000)
+      return
+    }
+
     setLoading(true)
-    setTimeout(() => {
-      login({ id: '1', name: 'أحمد المدير', email, role: 'admin', company: 'شركة النور للتجارة' })
-      toast('مرحباً بك في سهل!', 'success')
-      navigate('/erp/dashboard')
-    }, 800)
+
+    // Simulate network delay
+    await new Promise(r => setTimeout(r, 600))
+
+    if (mode === 'admin') {
+      if (!email || !password) {
+        toast('يرجى إدخال البريد وكلمة المرور', 'warn')
+        setLoading(false)
+        return
+      }
+
+      const user = ADMIN_CREDENTIALS.find(u => u.email === email)
+      if (user) {
+        const valid = user.password === password
+        if (valid) {
+          login({ id: '1', name: user.name, email: user.email, role: user.role, company: 'شركة النور للتجارة' })
+          toast(`مرحباً ${user.name}!`, 'success')
+          setLoginAttempts(0)
+          navigate(user.role === 'admin' ? '/erp/dashboard' : '/erp/invoices')
+          setLoading(false)
+          return
+        }
+      }
+      setLoginAttempts(prev => prev + 1)
+      toast('بيانات الدخول غير صحيحة', 'danger')
+    } else {
+      // Delegate login via username/password
+      if (!username || !password) {
+        toast('يرجى إدخال اسم المستخدم وكلمة المرور', 'warn')
+        setLoading(false)
+        return
+      }
+
+      const delegate = validateDelegateLogin(username, password)
+      if (delegate) {
+        if (delegate.status !== 'active') {
+          toast('هذا الحساب موقوف — تواصل مع الإدارة', 'danger')
+          setLoading(false)
+          return
+        }
+        login({
+          id: delegate.id,
+          name: delegate.name,
+          email: delegate.email,
+          role: 'delegate',
+          company: 'شركة النور للتجارة',
+          delegateId: delegate.id,
+        })
+        toast(`مرحباً ${delegate.name}!`, 'success')
+        setLoginAttempts(0)
+        navigate('/delegate/home')
+        setLoading(false)
+        return
+      }
+      setLoginAttempts(prev => prev + 1)
+      toast('اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
+    }
+    setLoading(false)
   }
 
   return (
@@ -42,41 +124,124 @@ export default function Login() {
         <div className="auth-title">تسجيل الدخول</div>
         <div className="auth-sub">أدخل بياناتك للوصول لحسابك</div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">البريد الإلكتروني</label>
-            <input
-              className="form-control"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="admin@company.sa"
-            />
-          </div>
+        {/* Mode switcher */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, background: 'var(--bg)', borderRadius: 10, padding: 4, border: '1px solid var(--border)' }}>
+          <button
+            type="button"
+            onClick={() => setMode('admin')}
+            style={{
+              flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, transition: 'all .2s',
+              background: mode === 'admin' ? 'var(--card)' : 'transparent',
+              color: mode === 'admin' ? 'var(--text)' : 'var(--muted)',
+              boxShadow: mode === 'admin' ? 'var(--shadow)' : 'none',
+            }}
+          >
+            <i className="fa fa-user-shield" style={{ marginLeft: 6 }} />
+            إدارة
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('delegate')}
+            style={{
+              flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, transition: 'all .2s',
+              background: mode === 'delegate' ? 'var(--card)' : 'transparent',
+              color: mode === 'delegate' ? 'var(--text)' : 'var(--muted)',
+              boxShadow: mode === 'delegate' ? 'var(--shadow)' : 'none',
+            }}
+          >
+            <i className="fa fa-user-tie" style={{ marginLeft: 6 }} />
+            مندوب
+          </button>
+        </div>
 
-          <div className="form-group">
-            <label className="form-label">كلمة المرور</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                className="form-control"
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{ paddingLeft: 40 }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(!showPass)}
-                style={{
-                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer',
-                }}
-              >
-                <i className={`fa ${showPass ? 'fa-eye-slash' : 'fa-eye'}`} />
-              </button>
+        <form onSubmit={handleSubmit}>
+          {mode === 'admin' ? (
+            <>
+              <div className="form-group">
+                <label className="form-label">البريد الإلكتروني</label>
+                <input
+                  className="form-control"
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="البريد الإلكتروني"
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">كلمة المرور</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="form-control"
+                    type={showPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="كلمة المرور"
+                    style={{ paddingLeft: 40 }}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    style={{
+                      position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer',
+                    }}
+                  >
+                    <i className={`fa ${showPass ? 'fa-eye-slash' : 'fa-eye'}`} />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="form-group">
+                <label className="form-label">اسم المستخدم</label>
+                <input
+                  className="form-control"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="اسم المستخدم"
+                  autoComplete="username"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">كلمة المرور</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="form-control"
+                    type={showPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="كلمة المرور"
+                    style={{ paddingLeft: 40 }}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    style={{
+                      position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer',
+                    }}
+                  >
+                    <i className={`fa ${showPass ? 'fa-eye-slash' : 'fa-eye'}`} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {loginAttempts > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 12, padding: '8px 12px', background: 'var(--danger-bg)', borderRadius: 8 }}>
+              <i className="fa fa-exclamation-triangle" style={{ marginLeft: 6 }} />
+              محاولات خاطئة: {loginAttempts} / 5
             </div>
-          </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
@@ -85,8 +250,8 @@ export default function Login() {
             <a href="#" style={{ color: 'var(--blue)', fontSize: 13, fontWeight: 600 }}>نسيت كلمة المرور؟</a>
           </div>
 
-          <button className="btn btn-primary w-full" type="submit" disabled={loading} style={{ justifyContent: 'center', padding: '12px 0' }}>
-            {loading ? <><i className="fa fa-spinner fa-spin" /> جارٍ تسجيل الدخول...</> : 'تسجيل الدخول'}
+          <button className="btn btn-primary w-full" type="submit" disabled={loading || isLocked} style={{ justifyContent: 'center', padding: '12px 0' }}>
+            {loading ? <><i className="fa fa-spinner fa-spin" /> جارٍ تسجيل الدخول...</> : isLocked ? 'الحساب مقفل' : 'تسجيل الدخول'}
           </button>
         </form>
 

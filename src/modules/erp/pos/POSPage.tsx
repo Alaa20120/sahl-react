@@ -2,7 +2,7 @@ import { useState } from 'react'
 import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import { fmt } from '@/lib/format'
-import { POS_PRODUCTS, POS_CATEGORIES, RECENT_SALES, POS_STATS } from '@/lib/mock-data/pos'
+import { POS_PRODUCTS, POS_CATEGORIES, RECENT_SALES } from '@/lib/mock-data/pos'
 import { toast } from '@/lib/toast'
 
 interface CartItem { id: string; name: string; price: number; qty: number }
@@ -59,10 +59,10 @@ export default function POSPage() {
       <PageHeader title="نقطة البيع" subtitle="POS — إدارة المبيعات النقدية" />
 
       <div className="stats-grid mb-4" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-        <StatCard label="مبيعات اليوم" value={fmt(POS_STATS.todaySales)} dark icon="fa-cash-register" />
-        <StatCard label="عدد الفواتير" value={String(POS_STATS.todayTransactions)} icon="fa-receipt" iconColor="var(--blue)" />
-        <StatCard label="مبيعات الشهر" value={fmt(POS_STATS.monthSales)} badge="▲" badgeType="success" icon="fa-chart-line" iconColor="var(--success)" />
-        <StatCard label="متوسط الفاتورة" value={fmt(POS_STATS.avgTicket)} icon="fa-calculator" iconColor="var(--warn)" />
+        <StatCard label="مبيعات اليوم" value={fmt(0)} dark icon="fa-cash-register" />
+        <StatCard label="عدد الفواتير" value={String(0)} icon="fa-receipt" iconColor="var(--blue)" />
+        <StatCard label="مبيعات الشهر" value={fmt(0)} badge="▲" badgeType="success" icon="fa-chart-line" iconColor="var(--success)" />
+        <StatCard label="متوسط الفاتورة" value={fmt(0)} icon="fa-calculator" iconColor="var(--warn)" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, alignItems: 'start' }}>

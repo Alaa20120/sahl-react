@@ -4,36 +4,78 @@ import StatCard from '@/components/ui/StatCard'
 import Card from '@/components/ui/Card'
 import Modal from '@/components/ui/Modal'
 import { fmt, fmtDate } from '@/lib/format'
-import { TRANSACTIONS, ACCOUNTS, TREASURY_STATS, type TxType, type TxCategory } from '@/lib/mock-data/treasury'
+import { type TxType, type TxCategory } from '@/lib/mock-data/treasury'
+import { useTreasuryStore } from '@/store/treasury.store'
+import { useInvoiceStore } from '@/store/invoice.store'
+import { usePurchaseStore } from '@/store/purchase.store'
+import { exportExcel } from '@/lib/excel'
+import { printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
 
 const TYPE_COLORS: Record<TxType, string> = { in: 'var(--success)', out: 'var(--danger)' }
 const CAT_ICONS: Record<TxCategory, string> = {
   invoice: 'fa-file-invoice',
   expense: 'fa-receipt',
-  salary:  'fa-users',
-  purchase:'fa-shopping-cart',
-  transfer:'fa-arrows-left-right',
-  other:   'fa-circle-dot',
+  salary: 'fa-users',
+  purchase: 'fa-shopping-cart',
+  transfer: 'fa-arrows-left-right',
+  collection: 'fa-arrow-down',
+  other: 'fa-circle-dot',
 }
 
 export default function TreasuryPage() {
+  const transactions = useTreasuryStore(s => s.transactions)
+  const accounts = useTreasuryStore(s => s.accounts)
+  const addTransaction = useTreasuryStore(s => s.addTransaction)
+  const invoices = useInvoiceStore(s => s.invoices)
+  const purchases = usePurchaseStore(s => s.purchases)
+
+  const inventoryValue = purchases
+    .filter(p => p.status === 'received')
+    .reduce((s, p) => s + p.total, 0)
+  const soldValue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0)
+
   const [activeAccount, setActiveAccount] = useState('all')
   const [showNew, setShowNew] = useState(false)
   const [txType, setTxType] = useState<'in' | 'out'>('in')
+  const [txCategory, setTxCategory] = useState<TxCategory>('other')
   const [amount, setAmount] = useState('')
   const [desc, setDesc] = useState('')
+  const [selectedAccount, setSelectedAccount] = useState('cash')
 
   const filtered = activeAccount === 'all'
-    ? TRANSACTIONS
-    : TRANSACTIONS.filter(t => t.account === activeAccount)
+    ? transactions
+    : transactions.filter(t => t.account === activeAccount)
+
+  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0)
+  const totalIn = transactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0)
+  const totalOut = transactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0)
 
   const handleSave = () => {
     if (!amount || !desc) { toast('يرجى ملء جميع الحقول', 'warn'); return }
-    toast(`تم تسجيل ${txType === 'in' ? 'إيراد' : 'مصروف'} بقيمة ${fmt(+amount)}`, 'success')
+
+    const amt = parseFloat(amount)
+    const ref = `TX-${Date.now()}`
+    addTransaction({
+      date: new Date().toISOString().slice(0, 10),
+      description: desc,
+      type: txType,
+      category: txCategory,
+      amount: amt,
+      account: selectedAccount,
+      ref,
+    })
+
+    // Print receipt automatically
+    const accountName = accounts.find(a => a.id === selectedAccount)?.label ?? selectedAccount
+    const categoryLabel = txCategory === 'invoice' ? 'فواتير' : txCategory === 'expense' ? 'مصروفات' : txCategory === 'salary' ? 'رواتب' : txCategory === 'purchase' ? 'مشتريات' : txCategory === 'transfer' ? 'تحويل' : 'أخرى'
+    printFinancialReceipt(txType, amt, desc, accountName, categoryLabel, ref)
+
+    toast(`تم تسجيل ${txType === 'in' ? 'إيراد' : 'مصروف'} بقيمة ${fmt(amt)}`, 'success')
     setShowNew(false)
     setAmount('')
     setDesc('')
+    setTxCategory('other')
   }
 
   return (
@@ -43,8 +85,35 @@ export default function TreasuryPage() {
         subtitle="إدارة الحركات المالية والأرصدة"
         actions={
           <>
-            <button className="btn btn-outline btn-sm" onClick={() => toast('جارٍ تصدير كشف الحساب...', 'info')}>
-              <i className="fa fa-download" /> تصدير
+            <button className="btn btn-outline btn-sm" onClick={() => {
+              exportExcel({
+                title: 'كشف الحركات المالية',
+                filename: `خزينة-${new Date().toISOString().slice(0, 10)}`,
+                columns: [
+                  { header: 'رقم الحركة', key: 'id', width: 18, type: 'text', align: 'center' },
+                  { header: 'التاريخ', key: 'date', width: 14, type: 'date', align: 'center' },
+                  { header: 'البيان', key: 'description', width: 34, type: 'text' },
+                  { header: 'الفئة', key: 'category', width: 14, type: 'text', align: 'center' },
+                  { header: 'النوع', key: 'type', width: 12, type: 'status', align: 'center' },
+                  { header: 'المبلغ', key: 'amount', width: 18, type: 'currency' },
+                  { header: 'الرصيد', key: 'balance', width: 18, type: 'currency' },
+                  { header: 'المرجع', key: 'ref', width: 16, type: 'text', align: 'center' },
+                  { header: 'الحساب', key: 'account', width: 16, type: 'text', align: 'center' },
+                ],
+                rows: filtered.map(t => ({
+                  ...t,
+                  ref: t.ref ?? '—',
+                  account: accounts.find(a => a.id === t.account)?.label ?? t.account,
+                })),
+                totals: {
+                  id: '',
+                  description: `${filtered.length} حركة`,
+                  amount: filtered.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0),
+                },
+              })
+              toast('تم تصدير كشف الحساب بنجاح', 'success')
+            }}>
+              <i className="fa fa-file-excel" /> تصدير Excel
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
               <i className="fa fa-plus" /> حركة جديدة
@@ -55,14 +124,17 @@ export default function TreasuryPage() {
 
       {/* Stats */}
       <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-        <StatCard label="الرصيد الإجمالي" value={fmt(TREASURY_STATS.totalBalance)} dark icon="fa-wallet" />
-        <StatCard label="إجمالي الوارد" value={fmt(TREASURY_STATS.totalIn)} badge="▲" badgeType="success" icon="fa-arrow-down-to-line" iconColor="var(--success)" />
-        <StatCard label="إجمالي الصادر" value={fmt(TREASURY_STATS.totalOut)} badge="▼" badgeType="danger" icon="fa-arrow-up-from-line" iconColor="var(--danger)" />
-        <StatCard label="رصيد نقدي" value={fmt(TREASURY_STATS.cashBalance)} icon="fa-money-bill-wave" iconColor="var(--blue)" />
+        <StatCard label="الرصيد الإجمالي" value={fmt(totalBalance)} dark icon="fa-wallet" />
+        <StatCard label="إجمالي الوارد" value={fmt(totalIn)} badge="▲" badgeType="success" icon="fa-arrow-down" iconColor="var(--success)" />
+        <StatCard label="إجمالي الصادر" value={fmt(totalOut)} badge="▼" badgeType="danger" icon="fa-arrow-up" iconColor="var(--danger)" />
+        <StatCard label="قيمة المشتريات المستلمة" value={fmt(inventoryValue)} icon="fa-boxes-stacking" iconColor="var(--blue)" badge="مخزون" badgeType="warn" />
+      </div>
+      <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(1,1fr)' }}>
+        <StatCard label="إجمالي المبيعات المحصلة" value={fmt(soldValue)} icon="fa-chart-line" iconColor="var(--success)" badge="مدفوع" badgeType="success" />
       </div>
 
       {/* Accounts */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${ACCOUNTS.length + 1}, 1fr)`, gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${accounts.length + 1}, 1fr)`, gap: 12, marginBottom: 24 }}>
         <button
           onClick={() => setActiveAccount('all')}
           style={{
@@ -73,9 +145,9 @@ export default function TreasuryPage() {
           }}
         >
           <div style={{ fontSize: 11, opacity: .7, marginBottom: 4 }}>كل الحسابات</div>
-          <div style={{ fontWeight: 800, fontSize: 18 }}>{fmt(TREASURY_STATS.totalBalance)}</div>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>{fmt(totalBalance)}</div>
         </button>
-        {ACCOUNTS.map(acc => (
+        {accounts.map(acc => (
           <button
             key={acc.id}
             onClick={() => setActiveAccount(acc.id)}
@@ -162,9 +234,20 @@ export default function TreasuryPage() {
             <input className="form-control" placeholder="وصف الحركة..." value={desc} onChange={e => setDesc(e.target.value)} />
           </div>
           <div>
+            <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>الفئة</label>
+            <select className="form-control" value={txCategory} onChange={e => setTxCategory(e.target.value as TxCategory)}>
+              <option value="invoice">فواتير</option>
+              <option value="expense">مصروفات</option>
+              <option value="salary">رواتب</option>
+              <option value="purchase">مشتريات</option>
+              <option value="transfer">تحويل</option>
+              <option value="other">أخرى</option>
+            </select>
+          </div>
+          <div>
             <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>الحساب</label>
-            <select className="form-control">
-              {ACCOUNTS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+            <select className="form-control" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

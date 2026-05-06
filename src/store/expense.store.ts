@@ -6,6 +6,7 @@ interface ExpenseStore {
   expenses: Expense[]
   addExpense: (data: Omit<Expense, 'id'>) => void
   updateStatus: (id: string, status: ExpenseStatus) => void
+  setExpenses: (expenses: Expense[]) => void
   // Computed getters
   totalExpenses: () => number
   totalAdvances: () => number
@@ -29,6 +30,10 @@ export const useExpenseStore = create<ExpenseStore>()(
         set(state => ({
           expenses: state.expenses.map(e => e.id === id ? { ...e, status } : e),
         }))
+      },
+
+      setExpenses(expenses) {
+        set({ expenses })
       },
 
       totalExpenses() {

@@ -20,10 +20,9 @@ const AVATAR_COLORS = ['#2563EB','#7C3AED','#10B981','#D97706','#DC2626','#0891B
 const BLANK_FORM = { name: '', type: 'customer' as CustomerType, phone: '', email: '', vatNumber: '', commercialReg: '', address: '' }
 
 export default function CustomersPage() {
-  useNavigate() // kept for future use
+  const navigate = useNavigate()
   const { customers, addCustomer, updateCustomer, deleteCustomer, addPayment, getPayments } = useCustomerStore()
   const { invoices } = useInvoiceStore()
-  const { purchases } = usePurchaseStore()
   const { delegates } = useDelegateStore()
   const { addTransaction } = useTreasuryStore()
 

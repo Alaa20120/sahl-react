@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { Expense } from '@/lib/mock-data/expenses'
 import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import StatusBadge from '@/components/ui/Badge'
@@ -102,7 +103,7 @@ export default function HRPage() {
     // 1. Regular Employees
     employees.forEach(emp => {
       if (emp.status !== 'active') return
-      const empAdvances = expenses.filter(ex => ex.type === 'سلفة' && ex.employee === emp.name && ex.status === 'approved').reduce((s, ex) => s + ex.amount, 0)
+      const empAdvances = expenses.filter((ex: Expense) => ex.type === 'advance' && ex.employee === emp.name && ex.status === 'approved').reduce((s, ex) => s + ex.amount, 0)
       items.push({
         id: emp.id, name: emp.name, type: 'موظف',
         basic: emp.salary, allowances: emp.allowances, deductions: emp.deductions,
@@ -115,7 +116,7 @@ export default function HRPage() {
     delegates.forEach(del => {
       if (del.status !== 'active') return
       const commission = del.stats.totalSales * 0.05
-      const delAdvances = expenses.filter(ex => ex.type === 'سلفة' && ex.employee === del.name && ex.status === 'approved').reduce((s, ex) => s + ex.amount, 0)
+      const delAdvances = expenses.filter((ex: Expense) => ex.type === 'advance' && ex.employee === del.name && ex.status === 'approved').reduce((s, ex) => s + ex.amount, 0)
       items.push({
         id: del.id, name: del.name, type: 'مندوب',
         basic: 4000, allowances: commission, deductions: 0,
@@ -155,7 +156,7 @@ export default function HRPage() {
     })
 
     // Mark advances as paid
-    setExpenses(prev => prev.map(ex => ex.type === 'سلفة' && ex.status === 'approved' ? { ...ex, status: 'paid' } : ex))
+    expenseStore.setExpenses(expenses.map((ex: Expense) => ex.type === 'advance' && ex.status === 'approved' ? { ...ex, status: 'paid' as const } : ex))
     setPayrollRun(true)
 
     toast('تم تشغيل مسير الرواتب وخصم السلف من الموظفين بنجاح!', 'success')

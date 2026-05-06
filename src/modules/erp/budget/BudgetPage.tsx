@@ -52,10 +52,8 @@ export default function BudgetPage() {
     const totalB = items.reduce((s, i) => s + i.budget, 0)
     const totalA = items.reduce((s, i) => s + i.actual, 0)
 
-    // Revenue from paid invoices
-    const rev = invoices
-      .filter(inv => inv.status === 'paid' || inv.status === 'partial')
-      .reduce((sum, inv) => sum + (inv.paidAmount || 0), 0)
+    // Revenue from all invoices (total amount, not just paid)
+    const rev = invoices.reduce((sum, inv) => sum + inv.total, 0)
 
     return {
       budgetItems: items.sort((a, b) => b.actual - a.actual),

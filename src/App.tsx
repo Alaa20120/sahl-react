@@ -65,7 +65,7 @@ const S = (C: React.ComponentType) => (
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/sahl-react">
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />

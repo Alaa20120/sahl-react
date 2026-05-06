@@ -1,30 +1,21 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-    <meta name="theme-color" content="#0D1117" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="سهل" />
-    <meta name="description" content="نظام ERP عربي متكامل لإدارة الفواتير والمخزون والموارد البشرية" />
-    <title>سهل — نظام ERP عربي متكامل</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('SW registered:', reg.scope))
-            .catch((err) => console.log('SW registration failed:', err))
-        })
-      }
-    </script>
-  </body>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>سهل — نظام ERP</title>
+  <script>
+    // SPA redirect for GitHub Pages
+    // Save the current path to sessionStorage and redirect to index
+    const path = window.location.pathname;
+    const base = '/sahl-react/';
+    if (path.startsWith(base)) {
+      const route = path.slice(base.length);
+      sessionStorage.setItem('gh-pages-route', route + window.location.search + window.location.hash);
+    }
+    window.location.replace(base);
+  </script>
+</head>
+<body>
+  جاري التحميل...
+</body>
 </html>

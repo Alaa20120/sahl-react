@@ -10,7 +10,6 @@ type LoginMode = 'admin' | 'delegate'
 // Admin account
 const ADMIN_CREDENTIALS = [
   { email: 'admin', password: '123456', name: 'المدير', role: 'admin' as const },
-  { email: 'mandoob', password: '123456', name: 'مندوب', role: 'delegate' as const },
 ]
 
 // Default delegate account (hardcoded for initial access)

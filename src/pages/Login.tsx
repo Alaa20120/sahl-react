@@ -10,6 +10,7 @@ type LoginMode = 'admin' | 'delegate'
 // Admin account
 const ADMIN_CREDENTIALS = [
   { email: 'admin', password: '123456', name: 'المدير', role: 'admin' as const },
+  { email: 'mandoob', password: '123456', name: 'مندوب', role: 'delegate' as const },
 ]
 
 // Default delegate account (hardcoded for initial access)
@@ -181,14 +182,14 @@ export default function Login() {
           {mode === 'admin' ? (
             <>
               <div className="form-group">
-                <label className="form-label">البريد الإلكتروني</label>
+                <label className="form-label">البريد أو اسم المستخدم</label>
                 <input
                   className="form-control"
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="البريد الإلكتروني"
-                  autoComplete="email"
+                  placeholder="admin"
+                  autoComplete="username"
                 />
               </div>
 

@@ -464,8 +464,6 @@ export default function ReportsPage() {
     const inventoryValue = products.reduce((s, p) => s + p.stock * p.costPrice, 0)
     const cashBalance = accounts.reduce((s, a) => s + a.balance, 0)
     const grossProfit = totalRevenue + delegateRevenue - totalPurchases
-    // Cost of goods sold = purchases (simplified)
-    const cogs = totalPurchases
     const operatingProfit = grossProfit - totalExpenses
     const vatOut = totalTax + delegateTax
     const vatNet = Math.max(0, vatOut - purchaseTax)

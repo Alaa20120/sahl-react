@@ -6,11 +6,14 @@ import { toast } from '@/lib/toast'
 
 type LoginMode = 'admin' | 'delegate'
 
-// Admin credentials — plaintext for reliability (this is client-side only)
+// ── Default users for first login ─────────────────────────────
+// Admin account
 const ADMIN_CREDENTIALS = [
-  { email: 'admin@company.sa', password: 'admin123', name: 'أحمد المدير', role: 'admin' as const },
-  { email: 'acc@company.sa', password: 'acc123', name: 'سارة المحاسبة', role: 'accountant' as const },
+  { email: 'admin', password: '123456', name: 'المدير', role: 'admin' as const },
 ]
+
+// Default delegate account (hardcoded for initial access)
+const DEFAULT_DELEGATE = { username: 'mandoob', password: '123456', name: 'مندوب المبيعات' }
 
 export default function Login() {
   const [mode, setMode] = useState<LoginMode>('admin')
@@ -70,13 +73,31 @@ export default function Login() {
       setLoginAttempts(prev => prev + 1)
       toast('بيانات الدخول غير صحيحة', 'danger')
     } else {
-      // Delegate login via username/password
+      // Delegate login — check default delegate first, then delegate store
       if (!username || !password) {
         toast('يرجى إدخال اسم المستخدم وكلمة المرور', 'warn')
         setLoading(false)
         return
       }
 
+      // Check default delegate account
+      if (username === DEFAULT_DELEGATE.username && password === DEFAULT_DELEGATE.password) {
+        login({
+          id: 'DEL-DEFAULT',
+          name: DEFAULT_DELEGATE.name,
+          email: '',
+          role: 'delegate',
+          company: 'شركة سهل التقنية',
+          delegateId: 'DEL-DEFAULT',
+        })
+        toast(`مرحباً ${DEFAULT_DELEGATE.name}!`, 'success')
+        setLoginAttempts(0)
+        navigate('/delegate/home')
+        setLoading(false)
+        return
+      }
+
+      // Check delegate store
       const delegate = validateDelegateLogin(username, password)
       if (delegate) {
         if (delegate.status !== 'active') {
@@ -89,7 +110,7 @@ export default function Login() {
           name: delegate.name,
           email: delegate.email,
           role: 'delegate',
-          company: 'شركة النور للتجارة',
+          company: 'شركة سهل التقنية',
           delegateId: delegate.id,
         })
         toast(`مرحباً ${delegate.name}!`, 'success')

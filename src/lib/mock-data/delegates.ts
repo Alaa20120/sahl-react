@@ -1,4 +1,3 @@
-// ─── Types ────────────────────────────────────────────────────
 export type DelegateStatus = 'active' | 'inactive'
 export type DelegateInvoiceType = 'sale' | 'purchase'
 export type DelegateTransactionType = 'collection' | 'withdrawal' | 'expense' | 'commission' | 'remittance'
@@ -59,13 +58,13 @@ export interface DelegateTransaction {
 }
 
 export interface DelegateStats {
-  totalSales: number      // إجمالي فواتير البيع
-  totalPurchases: number  // إجمالي فواتير الشراء
-  collected: number       // إجمالي المحصّل من فواتير البيع
-  balance: number         // الرصيد = المحصّل - المصروفات - السحوبات
-  externalCredit: number  // إجمالي الآجل المتبقي
-  expenses: number        // إجمالي المصروفات
-  companyEntrusted: number // عهدة بضاعة الشركة
+  totalSales: number
+  totalPurchases: number
+  collected: number
+  balance: number
+  externalCredit: number
+  expenses: number
+  companyEntrusted: number
 }
 
 export interface Delegate {
@@ -86,10 +85,8 @@ export interface Delegate {
   stats: DelegateStats
 }
 
-// ─── Mock Data ────────────────────────────────────────────────
 export const DELEGATES: Delegate[] = []
 
-// ─── Helpers ──────────────────────────────────────────────────
 export function getDelegateById(id: string): Delegate | undefined {
   return DELEGATES.find(d => d.id === id)
 }

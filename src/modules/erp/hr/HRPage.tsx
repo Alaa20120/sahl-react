@@ -156,7 +156,7 @@ export default function HRPage() {
     })
 
     // Mark advances as paid
-    expenseStore.setExpenses(expenses.map((ex: Expense) => ex.type === 'advance' && ex.status === 'approved' ? { ...ex, status: 'paid' as const } : ex))
+    expenseStore.setExpenses(expenses.map((ex: Expense) => ex.type === 'advance' && ex.status === 'approved' ? { ...ex, status: 'paid' as Expense['status'] } : ex))
     setPayrollRun(true)
 
     toast('تم تشغيل مسير الرواتب وخصم السلف من الموظفين بنجاح!', 'success')

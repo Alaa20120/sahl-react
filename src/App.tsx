@@ -1,9 +1,19 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/layout/AppShell'
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { useAuthStore } from '@/store/auth.store'
+import { useCustomerStore } from '@/store/customer.store'
+import { useInvoiceStore } from '@/store/invoice.store'
+import { useInventoryStore } from '@/store/inventory.store'
+import { usePurchaseStore } from '@/store/purchase.store'
+import { useExpenseStore } from '@/store/expense.store'
+import { useTreasuryStore } from '@/store/treasury.store'
+import { useHRStore } from '@/store/hr.store'
+import { useDelegateStore } from '@/store/delegate.store'
 
 // ERP core
 const Dashboard        = lazy(() => import('@/modules/erp/dashboard/DashboardPage'))
@@ -23,7 +33,6 @@ const Purchases        = lazy(() => import('@/modules/erp/purchases/PurchasesPag
 const PurchaseDetail   = lazy(() => import('@/modules/erp/purchases/PurchaseDetailPage'))
 const Budget           = lazy(() => import('@/modules/erp/budget/BudgetPage'))
 
-
 // ERP analytics & reports
 const Reports            = lazy(() => import('@/modules/erp/reports/ReportsPage'))
 const FinancialReports   = lazy(() => import('@/modules/erp/financial-reports/FinancialReportsPage'))
@@ -32,10 +41,14 @@ const Insights           = lazy(() => import('@/modules/erp/insights/InsightsPag
 const AccountStatement   = lazy(() => import('@/modules/erp/account-statement/AccountStatementPage'))
 const ZATCA              = lazy(() => import('@/modules/erp/zatca/ZATCAPage'))
 
-// ERP operations
+// ERP accounting (Double Entry)
+const JournalPage        = lazy(() => import('@/modules/erp/accounting/JournalPage'))
+const TrialBalancePage   = lazy(() => import('@/modules/erp/accounting/TrialBalancePage'))
+const ChartOfAccountsPage = lazy(() => import('@/modules/erp/accounting/ChartOfAccountsPage'))
+const ProfitLossPage     = lazy(() => import('@/modules/erp/accounting/ProfitLossPage'))
+const BalanceSheetPage   = lazy(() => import('@/modules/erp/accounting/BalanceSheetPage'))
 
 // ERP system
-
 const Settings         = lazy(() => import('@/modules/erp/settings/SettingsPage'))
 const Help             = lazy(() => import('@/modules/erp/help/HelpPage'))
 
@@ -63,9 +76,53 @@ const S = (C: React.ComponentType) => (
   <Suspense fallback={<Loader />}><C /></Suspense>
 )
 
+function AppDataProvider() {
+  const fetchUser = useAuthStore(s => s.fetchUser)
+
+  useEffect(() => {
+    // Fetch user on mount
+    fetchUser()
+
+    // Fetch all data if Supabase is configured
+    if (isSupabaseConfigured()) {
+      useCustomerStore.getState().fetch()
+      useInvoiceStore.getState().fetch()
+      useInventoryStore.getState().fetch()
+      usePurchaseStore.getState().fetch()
+      useExpenseStore.getState().fetch()
+      useTreasuryStore.getState().fetch()
+      useHRStore.getState().fetch()
+      useDelegateStore.getState().fetch()
+    }
+  }, [fetchUser])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return
+
+    // Realtime subscriptions
+    const channels = [
+      supabase.channel('products-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => useInventoryStore.getState().fetch()),
+      supabase.channel('invoices-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => useInvoiceStore.getState().fetch()),
+      supabase.channel('customers-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => useCustomerStore.getState().fetch()),
+      supabase.channel('purchases-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, () => usePurchaseStore.getState().fetch()),
+      supabase.channel('expenses-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => useExpenseStore.getState().fetch()),
+    ]
+    channels.forEach(c => c.subscribe())
+    return () => channels.forEach(c => supabase.removeChannel(c))
+  }, [])
+
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter basename="/sahl-react">
+      <AppDataProvider />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -93,6 +150,14 @@ export default function App() {
           <Route path="analytics"          element={S(Analytics)} />
           <Route path="account-statement"  element={S(AccountStatement)} />
           <Route path="zatca"              element={S(ZATCA)} />
+
+          {/* Double Entry Accounting */}
+          <Route path="accounting/journal"          element={S(JournalPage)} />
+          <Route path="accounting/trial-balance"    element={S(TrialBalancePage)} />
+          <Route path="accounting/chart-of-accounts" element={S(ChartOfAccountsPage)} />
+          <Route path="accounting/profit-loss"      element={S(ProfitLossPage)} />
+          <Route path="accounting/balance-sheet"    element={S(BalanceSheetPage)} />
+
           <Route path="settings"           element={S(Settings)} />
           <Route path="help"               element={S(Help)} />
           <Route path="delegates"            element={S(DelegatesListPage)} />

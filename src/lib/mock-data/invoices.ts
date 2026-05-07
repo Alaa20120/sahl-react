@@ -1,4 +1,4 @@
-export type InvoiceStatus = 'paid' | 'partial' | 'pending' | 'overdue' | 'draft' | 'confirmed'
+export type InvoiceStatus = 'paid' | 'partial' | 'pending' | 'overdue' | 'draft' | 'confirmed' | 'returned'
 
 export type PaymentMethod = 'cash' | 'credit'
 
@@ -27,6 +27,9 @@ export interface Invoice {
   items: InvoiceItem[]
   createdBy?: string
   attachments: InvoiceAttachment[]
+  isReturn?: boolean
+  originalInvoiceId?: string
+  returnReason?: string
 }
 
 export interface InvoiceItem {

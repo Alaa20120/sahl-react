@@ -1,13 +1,17 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { EXPENSES, type Expense, type ExpenseStatus } from '@/lib/mock-data/expenses'
 
 interface ExpenseStore {
   expenses: Expense[]
-  addExpense: (data: Omit<Expense, 'id'>) => void
-  updateStatus: (id: string, status: ExpenseStatus) => void
+  loading: boolean
+  error: string | null
+
+  fetch: () => Promise<void>
+  addExpense: (data: Omit<Expense, 'id'>) => Promise<void>
+  updateStatus: (id: string, status: ExpenseStatus) => Promise<void>
   setExpenses: (expenses: Expense[]) => void
-  // Computed getters
   totalExpenses: () => number
   totalAdvances: () => number
   pendingCount: () => number
@@ -20,16 +24,52 @@ export const useExpenseStore = create<ExpenseStore>()(
   persist(
     (set, get) => ({
       expenses: EXPENSES,
+      loading: false,
+      error: null,
 
-      addExpense(data) {
-        const id = `EXP-${String(get().expenses.length + 1).padStart(3, '0')}`
-        set(state => ({ expenses: [{ ...data, id }, ...state.expenses] }))
+      async fetch() {
+        if (!isSupabaseConfigured()) return
+        set({ loading: true, error: null })
+        const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false })
+        if (error) {
+          set({ error: error.message, loading: false })
+        } else {
+          const mapped = (data || []).map((e: any): Expense => ({
+            id: e.id,
+            date: e.date,
+            employee: e.employee || '',
+            category: e.category || '',
+            description: e.description || '',
+            type: e.type || 'expense',
+            amount: Number(e.amount) || 0,
+            status: e.status || 'pending',
+          }))
+          set({ expenses: mapped, loading: false })
+        }
       },
 
-      updateStatus(id, status) {
-        set(state => ({
-          expenses: state.expenses.map(e => e.id === id ? { ...e, status } : e),
-        }))
+      async addExpense(data) {
+        const id = `EXP-${String(get().expenses.length + 1).padStart(3, '0')}`
+        const expense: Expense = { ...data, id }
+
+        if (isSupabaseConfigured()) {
+          const { error } = await supabase.from('expenses').insert({
+            date: data.date,
+            employee: data.employee || null,
+            category: data.category || null,
+            description: data.description || null,
+            type: data.type || 'expense',
+            amount: data.amount,
+            status: data.status || 'pending',
+          })
+          if (error) throw new Error(error.message)
+        }
+        set(state => ({ expenses: [expense, ...state.expenses] }))
+      },
+
+      async updateStatus(id, status) {
+        if (isSupabaseConfigured()) await supabase.from('expenses').update({ status }).eq('id', id)
+        set(state => ({ expenses: state.expenses.map(e => e.id === id ? { ...e, status } : e) }))
       },
 
       setExpenses(expenses) {

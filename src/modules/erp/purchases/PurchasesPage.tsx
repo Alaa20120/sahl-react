@@ -316,41 +316,38 @@ export default function PurchasesPage() {
       <Modal open={showNew} onClose={() => { setShowNew(false); resetForm() }} title={`أمر شراء جديد — ${nextNumber()}`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '72vh', overflowY: 'auto', paddingLeft: 4 }}>
 
-          {/* Supplier selection */}
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 8 }}>المورد *</label>
-            {!showCustom ? (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                  {SUPPLIERS.map(s => (
-                    <button key={s.id} type="button" onClick={() => setSupplierId(s.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 14px', borderRadius: 8, cursor: 'pointer', textAlign: 'right',
-                        border: `2px solid ${supplierId === s.id ? 'var(--primary)' : 'var(--border)'}`,
-                        background: supplierId === s.id ? 'var(--primary)08' : 'var(--bg)',
-                        transition: 'all .15s',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>{s.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                          {s.phone}{s.vatNumber ? ` · ض.ق.م: ${s.vatNumber}` : ''}
-                        </div>
-                      </div>
-                      {supplierId === s.id && <i className="fa fa-check-circle" style={{ color: 'var(--primary)', fontSize: 16, flexShrink: 0 }} />}
-                    </button>
-                  ))}
-                </div>
-                <button className="btn btn-outline btn-sm" onClick={() => setShowCustom(true)}>
-                  <i className="fa fa-plus" /> مورد غير مسجل
-                </button>
-              </>
-            ) : (
-              <div>
-                <input className="form-control" placeholder="اسم المورد..." value={customSupplier} onChange={e => setCustomSupplier(e.target.value)} style={{ marginBottom: 6 }} />
-                <button className="btn btn-outline btn-sm" onClick={() => { setShowCustom(false); setSupplierId(SUPPLIERS[0]?.id ?? '') }}>
-                  <i className="fa fa-list" /> اختر من القائمة
+          {/* Supplier — prominent at top */}
+          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--border)' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 10, color: 'var(--primary)' }}>
+              <i className="fa fa-truck" style={{ marginLeft: 6 }} />اسم المورد *
+            </label>
+            {SUPPLIERS.length > 0 ? (
+              <select
+                className="form-control"
+                value={supplierId}
+                onChange={e => { setSupplierId(e.target.value); setShowCustom(false) }}
+                style={{ marginBottom: 8 }}
+              >
+                <option value="">— اختر مورداً —</option>
+                {SUPPLIERS.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            ) : null}
+            <input
+              className="form-control"
+              placeholder={SUPPLIERS.length > 0 ? 'أو اكتب اسم مورد غير مسجل...' : 'اكتب اسم المورد...'}
+              value={supplierId ? '' : customSupplier}
+              onChange={e => { setCustomSupplier(e.target.value); setSupplierId('') }}
+              style={{ display: supplierId ? 'none' : 'block' }}
+            />
+            {supplierId && (
+              <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 4 }}>
+                <i className="fa fa-check-circle" style={{ marginLeft: 4 }} />
+                {SUPPLIERS.find(s => s.id === supplierId)?.name}
+                <button type="button" onClick={() => { setSupplierId(''); setCustomSupplier('') }}
+                  style={{ marginRight: 8, background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 11 }}>
+                  تغيير
                 </button>
               </div>
             )}

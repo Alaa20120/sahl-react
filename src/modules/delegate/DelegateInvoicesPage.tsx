@@ -30,7 +30,7 @@ export default function DelegateInvoicesPage() {
   const filtered = invoices.filter(inv => filter === 'all' || inv.type === filter)
 
   async function handleConfirm(id: string) {
-    const result = confirmDelegateInvoice(delegateId, id)
+    const result = await confirmDelegateInvoice(delegateId, id)
     if (!result.success) {
       toast(`تعذر التأكيد: "${result.failedItem}" — الكمية غير كافية في المستودع`, 'danger')
       return

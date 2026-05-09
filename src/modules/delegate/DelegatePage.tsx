@@ -237,8 +237,8 @@ export default function DelegatePage() {
     setNewItems([])
   }
 
-  function handleConfirmInvoice(invId: string) {
-    const result = confirmDelegateInvoice(delegateId, invId)
+  async function handleConfirmInvoice(invId: string) {
+    const result = await confirmDelegateInvoice(delegateId, invId)
     if (!result.success) {
       toast(`تعذر التأكيد: "${result.failedItem}" — الكمية غير كافية`, 'danger')
       return

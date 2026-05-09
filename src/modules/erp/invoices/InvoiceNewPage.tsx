@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fmt } from '@/lib/format'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { CUSTOMERS } from '@/lib/mock-data/customers'
-import { PRODUCTS, type Product } from '@/lib/mock-data/inventory'
+import { useCustomerStore } from '@/store/customer.store'
+import { useInventoryStore } from '@/store/inventory.store'
+import type { Product } from '@/lib/mock-data/inventory'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/lib/toast'
@@ -13,21 +14,22 @@ interface LineItem { id: number; productId?: string; desc: string; qty: string; 
 
 // ── Product picker input ─────────────────────────────────────────────────────
 function ProductPicker({
-  value, placeholder, onChange, onSelect,
+  value, placeholder, onChange, onSelect, products,
 }: {
   value: string
   placeholder: string
   onChange: (v: string) => void
   onSelect: (p: Product) => void
+  products: Product[]
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   const matches = value.trim()
-    ? PRODUCTS.filter(p =>
+    ? products.filter(p =>
         p.name.includes(value) || p.sku.toLowerCase().includes(value.toLowerCase())
       )
-    : PRODUCTS
+    : products
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -125,11 +127,16 @@ export default function InvoiceNewPage() {
   const { nextNumber, addInvoice } = useInvoiceStore()
   const user = useAuthStore(s => s.user)
   const isMobile = useIsMobile()
+  const allCustomers = useCustomerStore(s => s.customers)
+  const allProducts = useInventoryStore(s => s.products)
+  // Only actual customers (not suppliers)
+  const CUSTOMERS = allCustomers.filter(c => c.type === 'customer' || c.type === 'both')
+  const PRODUCTS = allProducts.filter(p => p.status === 'active')
 
   const today = new Date().toISOString().split('T')[0]
   const due30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
 
-  const [customerId, setCustomerId]       = useState(CUSTOMERS[0]?.id ?? '')
+  const [customerId, setCustomerId]       = useState('')
   const [date, setDate]                   = useState(today)
   const [dueDate, setDueDate]             = useState('')
   const [hasDueDate, setHasDueDate]       = useState(false)
@@ -227,6 +234,7 @@ export default function InvoiceNewPage() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>العميل *</label>
                 <select className="form-control" value={customerId} onChange={e => setCustomerId(e.target.value)}>
+                  <option value="">— اختر العميل —</option>
                   {CUSTOMERS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 {customer && (
@@ -330,6 +338,7 @@ export default function InvoiceNewPage() {
               {items.map((item, idx) => (
                 <div key={item.id} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 70px 70px 36px' : '1fr 80px 120px 120px 36px', gap: 8, alignItems: 'center' }}>
                   <ProductPicker
+                    products={PRODUCTS}
                     value={item.desc}
                     placeholder={`الصنف أو الخدمة ${idx + 1}...`}
                     onChange={v => updateItem(item.id, 'desc', v)}

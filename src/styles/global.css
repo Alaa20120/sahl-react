@@ -64,7 +64,11 @@ input, select, textarea { font-family: inherit; }
   position: fixed;
   right: 0; top: 0; bottom: 0;
   z-index: 100;
-  overflow: hidden; /* no scroll on the container itself */
+  overflow: hidden;
+  /* Logo stays at top, footer at bottom, nav scrolls in middle */
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* critical: fixed height enables child scroll */
 }
 .sidebar-logo {
   padding: 20px 16px;

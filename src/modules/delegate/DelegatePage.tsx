@@ -426,58 +426,69 @@ export default function DelegatePage() {
         </>
       )}
 
-      {tab === 'warehouse' && (
-        <Card title="مستودعي">
-          {/* Desktop */}
-          <div className="desktop-only">
+      {tab === 'warehouse' && (() => {
+        // Aggregate warehouse: total received per product
+        const receivedByProduct: Record<string, { name: string; sku: string; cost: number; total: number }> = {}
+        delegateWarehouse.forEach((w: any) => {
+          const key = w.productId || w.productName
+          if (!receivedByProduct[key]) receivedByProduct[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, total: 0 }
+          receivedByProduct[key].total += w.qty
+        })
+        // Sold quantities from confirmed/paid sale invoices
+        const soldByProduct: Record<string, number> = {}
+        delegateInvoices.filter((inv: any) => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid')).forEach((inv: any) => {
+          (inv.items || []).forEach((it: any) => {
+            if (it.productId) soldByProduct[it.productId] = (soldByProduct[it.productId] || 0) + (it.qty || 0)
+          })
+        })
+        const rows = Object.entries(receivedByProduct).map(([key, data]) => ({
+          key, ...data,
+          sold: soldByProduct[key] || 0,
+          available: Math.max(0, data.total - (soldByProduct[key] || 0)),
+        }))
+
+        return (
+          <Card title="مستودعي">
             <div className="table-wrap">
               <table>
-                <thead><tr><th>الصنف</th><th>الكود</th><th>الكمية</th><th>سعر التكلفة</th><th>القيمة</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>الصنف</th>
+                    <th style={{ textAlign: 'center' }}>المستلم</th>
+                    <th style={{ textAlign: 'center', color: 'var(--danger)' }}>المباع</th>
+                    <th style={{ textAlign: 'center', color: 'var(--success)' }}>المتوفر</th>
+                    <th>سعر التكلفة</th>
+                    <th>قيمة المتوفر</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {delegateWarehouse.map((w: any) => (
-                    <tr key={w.id}>
-                      <td style={{ fontWeight: 600 }}>{w.productName}</td>
-                      <td><span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--blue)' }}>{w.productSku}</span></td>
-                      <td style={{ fontWeight: 700 }}>{fmtNum(w.qty)}</td>
-                      <td>{fmt(w.costPrice)}</td>
-                      <td style={{ fontWeight: 700 }}>{fmt(w.qty * w.costPrice)}</td>
+                  {rows.map(r => (
+                    <tr key={r.key}>
+                      <td style={{ fontWeight: 600 }}>{r.name}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{fmtNum(r.total)}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{r.sold > 0 ? fmtNum(r.sold) : '—'}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
+                      <td>{fmt(r.cost)}</td>
+                      <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
                     </tr>
                   ))}
-                  {delegateWarehouse.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
-                    <td colSpan={4}>الإجمالي</td>
-                    <td>{fmt(whTotal)}</td>
+                    <td>الإجمالي</td>
+                    <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + r.total, 0))}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{fmtNum(rows.reduce((s, r) => s + r.sold, 0))}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--success)' }}>{fmtNum(rows.reduce((s, r) => s + r.available, 0))}</td>
+                    <td></td>
+                    <td>{fmt(rows.reduce((s, r) => s + r.available * r.cost, 0))}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-          </div>
-          {/* Mobile */}
-          <div className="mobile-card-list">
-            {delegateWarehouse.map((w: any) => (
-              <div key={w.id} className="mobile-card">
-                <div className="mobile-card-row">
-                  <span style={{ fontWeight: 700 }}>{w.productName}</span>
-                  <span className="mobile-card-value">{fmtNum(w.qty)} قطعة</span>
-                </div>
-                <div className="mobile-card-row">
-                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--blue)' }}>{w.productSku}</span>
-                  <span style={{ fontWeight: 700 }}>{fmt(w.qty * w.costPrice)}</span>
-                </div>
-              </div>
-            ))}
-            {delegateWarehouse.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</div>}
-            {delegateWarehouse.length > 0 && (
-              <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 8, marginTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-                <span>الإجمالي</span>
-                <span>{fmt(whTotal)}</span>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+          </Card>
+        )
+      })()}
 
       {/* Finance Tab */}
       {tab === 'finance' && (() => {

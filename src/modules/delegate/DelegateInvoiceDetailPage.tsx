@@ -38,9 +38,9 @@ export default function DelegateInvoiceDetailPage() {
   const [payAmount, setPayAmount] = useState('')
   const [showPayForm, setShowPayForm] = useState(false)
 
-  function handleConfirmDelivery() {
+  async function handleConfirmDelivery() {
     if (!invoice) return
-    const result = confirmDelegateInvoice(delegateId, invoice.id)
+    const result = await confirmDelegateInvoice(delegateId, invoice.id)
     if (!result.success) {
       toast(`تعذر التأكيد: "${result.failedItem}" — الكمية غير كافية في المستودع`, 'danger')
       return
@@ -48,7 +48,7 @@ export default function DelegateInvoiceDetailPage() {
     // Sync main inventory for catalog items
     const catalogItems = (invoice.items ?? []).filter((it: any) => it.productId && PRODUCTS.some((p: any) => p.id === it.productId))
     if (catalogItems.length > 0) deductFromInventory(catalogItems.map((it: any) => ({ productId: it.productId, qty: it.qty })))
-    toast('تم تأكيد التسليم وخصم المخزون بنجاح', 'success')
+    toast('تم تأكيد التسليم وحُفظ في قاعدة البيانات ✅', 'success')
   }
 
   if (!invoice) {

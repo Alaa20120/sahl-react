@@ -5,6 +5,7 @@ import StatusBadge from '@/components/ui/Badge'
 import StatCard from '@/components/ui/StatCard'
 import { fmt, fmtDate } from '@/lib/format'
 import { useInvoiceStore } from '@/store/invoice.store'
+import { usePurchaseStore } from '@/store/purchase.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { exportExcel } from '@/lib/excel'
@@ -37,6 +38,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function InvoicesPage() {
   const { invoices: adminInvoices } = useInvoiceStore()
+  const { purchases } = usePurchaseStore()
   const delegates = useDelegateStore(s => s.delegates)
   const customers = useCustomerStore(s => s.customers)
   const co = useAppStore(s => s.company)
@@ -108,8 +110,15 @@ export default function InvoicesPage() {
     const matchSource = filterSource === 'all' || inv.source === filterSource
     const q = search.trim()
     const matchSearch = !q || inv.customer.includes(q) || inv.number.includes(q) || (inv.delegateName ?? '').includes(q)
-    // Filter by customer if coming from customer profile
-    const matchCustomer = !customerFilter || inv.customer === filteredCustomer?.name || inv.customerId === customerFilter
+    // Filter by customer: match by ID, exact name, or partial name
+    const matchCustomer = !customerFilter || (
+      inv.customerId === customerFilter ||
+      (filteredCustomer && (
+        inv.customer === filteredCustomer.name ||
+        inv.customer?.includes(filteredCustomer.name) ||
+        filteredCustomer.name?.includes(inv.customer || '')
+      ))
+    )
     return matchStatus && matchSource && matchSearch && matchCustomer
   }), [allInvoices, filterStatus, filterSource, search, customerFilter, filteredCustomer])
 

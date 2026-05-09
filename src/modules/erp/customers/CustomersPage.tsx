@@ -7,6 +7,7 @@ import StatCard from '@/components/ui/StatCard'
 import { fmt, initials } from '@/lib/format'
 import { useCustomerStore } from '@/store/customer.store'
 import { useInvoiceStore } from '@/store/invoice.store'
+import { usePurchaseStore } from '@/store/purchase.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { printPaymentReceipt, printAccountStatement } from '@/lib/print'
@@ -23,6 +24,7 @@ export default function CustomersPage() {
   const navigate = useNavigate()
   const { customers, addCustomer, updateCustomer, deleteCustomer, addPayment, getPayments } = useCustomerStore()
   const { invoices } = useInvoiceStore()
+  const { purchases } = usePurchaseStore()
   const { delegates } = useDelegateStore()
   const { addTransaction } = useTreasuryStore()
   const { saving, run } = useSaving()
@@ -486,21 +488,45 @@ export default function CustomersPage() {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-              <div style={{ background: profileCustomer.balance < 0 ? 'var(--danger-bg)' : profileCustomer.balance > 0 ? 'var(--success-bg)' : 'var(--bg)', borderRadius: 8, padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>الرصيد الحالي</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: profileCustomer.balance < 0 ? 'var(--danger)' : profileCustomer.balance > 0 ? 'var(--success)' : 'var(--primary)' }}>
-                  {fmt(Math.abs(profileCustomer.balance))}
-                  <span style={{ fontSize: 12, fontWeight: 500, marginRight: 4 }}>
-                    {profileCustomer.balance < 0 ? '— مدين (عليه دين)' : profileCustomer.balance > 0 ? '— دائن (له رصيد)' : ''}
-                  </span>
+            {(() => {
+              const isSupplier = profileCustomer.type === 'supplier'
+              // Real-time calculations
+              const customerInvs = invoices.filter(inv =>
+                inv.customerId === profileCustomer.id || inv.customer === profileCustomer.name
+              )
+              const supplierPOs = purchases.filter(po =>
+                po.supplier?.includes(profileCustomer.name) || profileCustomer.name?.includes(po.supplier || '')
+              )
+              const delegateInvs = delegates.flatMap(d => d.invoices.filter((inv: any) =>
+                inv.customerId === profileCustomer.id || inv.party === profileCustomer.name
+              ))
+              const totalSaleInvoices = customerInvs.reduce((s, i) => s + i.total, 0)
+              const totalPurchaseOrders = supplierPOs.reduce((s, p) => s + p.total, 0)
+              const totalDelegateInvs = delegateInvs.reduce((s: number, i: any) => s + i.total, 0)
+              const totalAll = isSupplier ? totalPurchaseOrders : (totalSaleInvoices + totalDelegateInvs)
+              const totalPaid = isSupplier
+                ? supplierPOs.reduce((s, p) => s + p.paid, 0)
+                : customerInvs.reduce((s, i) => s + (i.paidAmount ?? (i.status === 'paid' ? i.total : 0)), 0)
+              const outstanding = totalAll - totalPaid
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                  <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{isSupplier ? 'إجمالي المشتريات' : 'إجمالي الفواتير'}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800 }}>{fmt(totalAll)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{isSupplier ? `${supplierPOs.length} أمر شراء` : `${customerInvs.length + delegateInvs.length} فاتورة`}</div>
+                  </div>
+                  <div style={{ background: 'var(--success-bg)', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>المدفوع</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>{fmt(totalPaid)}</div>
+                  </div>
+                  <div style={{ background: outstanding > 0 ? 'var(--danger-bg)' : 'var(--bg)', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>المستحق / الآجل</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: outstanding > 0 ? 'var(--danger)' : 'var(--success)' }}>{fmt(outstanding)}</div>
+                  </div>
                 </div>
-              </div>
-              <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>إجمالي الفواتير</div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>{profileCustomer.totalInvoices} فاتورة</div>
-              </div>
-            </div>
+              )
+            })()}
             {/* Payment history */}
             {getPayments(profileCustomer.id).length > 0 && (
               <div style={{ marginBottom: 16 }}>

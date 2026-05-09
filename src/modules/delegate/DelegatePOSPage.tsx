@@ -58,23 +58,31 @@ export default function DelegatePOSPage() {
     ? customerList.filter((c: any) => c.name.includes(customerSearch) || c.phone.includes(customerSearch))
     : customerList
 
-  // Products from delegate warehouse — works even for items not in main catalog
-  const warehouseProducts = useMemo(() =>
+  const inventoryProducts = useInventoryStore(s => s.products)
+
+  // Aggregate warehouse by productId — sum available quantities
+  const warehouseProducts = useMemo(() => {
+    const grouped: Record<string, any> = {}
     delegateWarehouse
-      .filter((w: any) => w.status === 'in-stock' && w.qty > 0)
-      .map((w: any) => {
-        const catalog = PRODUCTS.find((pr: any) => pr.id === w.productId)
-        return {
-          id: w.productId,
-          name: catalog?.name || w.productName,
-          sku: catalog?.sku || w.productSku,
-          category: catalog?.category || 'أخرى',
-          sellPrice: catalog?.sellPrice ?? Math.round(w.costPrice * 1.3),
-          whQty: w.qty,
-          isInMainCatalog: !!catalog,
+      .filter((w: any) => w.qty > 0)
+      .forEach((w: any) => {
+        const key = w.productId || w.productName
+        if (!grouped[key]) {
+          const catalog = inventoryProducts.find((pr: any) => pr.id === w.productId)
+          grouped[key] = {
+            id: w.productId,
+            name: catalog?.name || w.productName,
+            sku: catalog?.sku || w.productSku,
+            category: catalog?.category || 'أخرى',
+            sellPrice: catalog?.sellPrice ?? Math.round(w.costPrice * 1.3),
+            whQty: 0,
+            isInMainCatalog: !!catalog,
+          }
         }
-      }),
-  [delegateWarehouse])
+        grouped[key].whQty += w.qty
+      })
+    return Object.values(grouped).filter((p: any) => p.whQty > 0)
+  }, [delegateWarehouse, inventoryProducts])
 
   const matches = search.trim()
     ? warehouseProducts.filter(p =>

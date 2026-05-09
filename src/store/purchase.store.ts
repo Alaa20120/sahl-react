@@ -76,23 +76,11 @@ export const usePurchaseStore = create<PurchaseStore>()(
       async addPurchase(data) {
         const year = new Date().getFullYear()
         const counters = { ...get().yearCounters }
-
-        // Get actual count from Supabase to avoid duplicates
-        let n = (counters[year] ?? 0) + 1
-        if (isSupabaseConfigured()) {
-          try {
-            const existing = await supaFetch('purchases', { select: 'id', limit: 500 })
-            const yearPrefix = `PO-${year}-`
-            const maxNum = (existing || [])
-              .map((p: any) => p.id || '')
-              .filter((id: string) => id.startsWith(yearPrefix))
-              .map((id: string) => parseInt(id.replace(yearPrefix, '')) || 0)
-              .reduce((max: number, num: number) => Math.max(max, num), 0)
-            n = maxNum + 1
-          } catch { /* use local counter as fallback */ }
-        }
+        // Use timestamp suffix to guarantee uniqueness — never duplicates
+        const ts = Date.now().toString().slice(-5)
+        const n = (counters[year] ?? 0) + 1
         counters[year] = n
-        const purchase: Purchase = { ...data, id: `PO-${year}-${String(n).padStart(3, '0')}` }
+        const purchase: Purchase = { ...data, id: `PO-${year}-${String(n).padStart(3,'0')}-${ts}` }
 
         if (isSupabaseConfigured()) {
           const result = await supaFetch('purchases', {

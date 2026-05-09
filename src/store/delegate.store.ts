@@ -262,11 +262,26 @@ export const useDelegateStore = create<DelegateStore>()(
             let warehouse = [...d.warehouse]
             for (const item of invoice.items) {
               if (!item.productId) continue
+              let remaining = item.qty
               warehouse = warehouse.map(w => {
-                if (w.productId !== item.productId || w.status !== 'in-stock') return w
-                const newQty = w.qty - item.qty
+                if (w.productId !== item.productId || w.status !== 'in-stock' || remaining <= 0) return w
+                const deduct = Math.min(w.qty, remaining)
+                remaining -= deduct
+                const newQty = w.qty - deduct
+                // Update Supabase warehouse entry
+                if (isSupabaseConfigured()) {
+                  if (newQty <= 0) {
+                    supaFetch('delegate_warehouse', { method: 'PATCH', filter: `id=eq.${w.id}`, body: { qty: 0, status: 'transferred' } }).catch(() => {})
+                  } else {
+                    supaFetch('delegate_warehouse', { method: 'PATCH', filter: `id=eq.${w.id}`, body: { qty: newQty } }).catch(() => {})
+                  }
+                }
                 return newQty <= 0 ? { ...w, qty: 0, status: 'transferred' as const } : { ...w, qty: newQty }
               }).filter(w => w.qty > 0 || w.status !== 'transferred')
+            }
+            // Update invoice status in Supabase
+            if (isSupabaseConfigured()) {
+              supaFetch('delegate_invoices', { method: 'PATCH', filter: `id=eq.${invoiceId}`, body: { status: 'confirmed', confirmed_at: new Date().toISOString().slice(0,10) } }).catch(() => {})
             }
             return {
               ...d, warehouse,

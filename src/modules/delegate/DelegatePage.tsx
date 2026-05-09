@@ -78,9 +78,20 @@ export default function DelegatePage() {
     ? parties.filter((p: any) => p.name.includes(partySearch) || p.phone.includes(partySearch))
     : parties
 
-  // Aggregate warehouse by productId — sum quantities across multiple entries
+  // Available = total received - total sold in confirmed/paid invoices
   const availableProducts = newInvType === 'sale'
     ? (() => {
+        // Step 1: Sum sold quantities from confirmed invoices
+        const soldQty: Record<string, number> = {}
+        delegateInvoices
+          .filter((inv: any) => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
+          .forEach((inv: any) => {
+            (inv.items || []).forEach((item: any) => {
+              if (item.productId) soldQty[item.productId] = (soldQty[item.productId] || 0) + (item.qty || 0)
+            })
+          })
+
+        // Step 2: Aggregate warehouse by productId
         const grouped: Record<string, any> = {}
         delegateWarehouse.forEach((w: any) => {
           if (!w.productId) return
@@ -98,6 +109,12 @@ export default function DelegatePage() {
           }
           grouped[w.productId].whQty += w.qty
         })
+
+        // Step 3: Subtract sold from available
+        Object.keys(grouped).forEach(pid => {
+          grouped[pid].whQty = Math.max(0, grouped[pid].whQty - (soldQty[pid] || 0))
+        })
+
         return Object.values(grouped).filter((p: any) => p.whQty > 0)
       })()
     : PRODUCTS.map((p: any) => ({ ...p, whQty: undefined }))

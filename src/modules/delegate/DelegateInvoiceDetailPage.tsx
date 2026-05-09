@@ -7,6 +7,7 @@ import { useDelegateStore } from '@/store/delegate.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { useInventoryStore } from '@/store/inventory.store'
 import { useTreasuryStore } from '@/store/treasury.store'
+import { useAppStore } from '@/store/app.store'
 import { printFinancialReceipt } from '@/lib/print'
 import { PRODUCTS } from '@/lib/mock-data/inventory'
 
@@ -30,6 +31,7 @@ export default function DelegateInvoiceDetailPage() {
   const addTreasuryTransaction = useTreasuryStore(s => s.addTransaction)
 
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
+  const co = useAppStore(s => s.company)
   const delegate = useMemo(() => delegates.find(d => d.id === delegateId), [delegates, delegateId])
   const invoice = useMemo(() => delegate?.invoices.find(inv => inv.id === id), [delegate, id])
 
@@ -119,6 +121,31 @@ export default function DelegateInvoiceDetailPage() {
         <span style={{ padding: '6px 16px', borderRadius: 20, fontWeight: 800, fontSize: 13, background: st.bg, color: st.color }}>
           {st.label}
         </span>
+      </div>
+
+      {/* Company + Delegate info banner */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--primary)', color: '#fff', borderRadius: 12, padding: '16px 20px' }}>
+          <div style={{ fontSize: 11, opacity: .6, marginBottom: 6 }}>البائع / الشركة</div>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>{co.name || 'اسم الشركة'}</div>
+          {co.nameEn && <div style={{ fontSize: 11, opacity: .7 }}>{co.nameEn}</div>}
+          <div style={{ fontSize: 11, opacity: .7, marginTop: 6, lineHeight: 1.8 }}>
+            {co.vat && <div>الرقم الضريبي: {co.vat}</div>}
+            {co.phone && <div>ج: {co.phone}</div>}
+            {co.address && <div>{co.address}، {co.city}</div>}
+          </div>
+        </div>
+        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>المندوب المسؤول</div>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>{delegate?.name || user?.name || '—'}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            <div>{delegate?.zone || ''}</div>
+            <div>{delegate?.phone || ''}</div>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, background: 'var(--success-bg)', color: 'var(--success)', padding: '3px 10px', borderRadius: 20, display: 'inline-block', fontWeight: 700 }}>
+            {isSale ? 'فاتورة مبيعات' : 'فاتورة مشتريات'}
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, alignItems: 'start' }}>
@@ -252,16 +279,21 @@ export default function DelegateInvoiceDetailPage() {
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 14 }}>ملخص الفاتورة</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--muted)' }}>قبل الضريبة</span>
-                <span style={{ fontWeight: 600 }}>{fmt(invoice.subtotal)}</span>
+                <span style={{ color: 'var(--muted)' }}>الإجمالي شامل الضريبة</span>
+                <span style={{ fontWeight: 600 }}>{fmt(invoice.total)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--muted)' }}>ضريبة 15%</span>
-                <span style={{ fontWeight: 600, color: 'var(--warn)' }}>{fmt(invoice.tax)}</span>
+                <span style={{ color: 'var(--muted)' }}>ضريبة القيمة المضافة مستخرجة (15%)</span>
+                <span style={{ fontWeight: 600, color: 'var(--warn)' }}>- {fmt(invoice.tax)}</span>
+              </div>
+              <div style={{ height: 1, background: 'var(--border)' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 900 }}>
+                <span>صافي قبل الضريبة</span>
+                <span style={{ color: 'var(--primary)' }}>{fmt(invoice.subtotal)}</span>
               </div>
               <div style={{ height: 1, background: 'var(--border)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 900 }}>
-                <span>الإجمالي</span>
+                <span>المبلغ الإجمالي</span>
                 <span style={{ color: 'var(--primary)' }}>{fmt(invoice.total)}</span>
               </div>
             </div>

@@ -135,7 +135,6 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
               borderRadius: 6,
               fontSize: 16,
               flexShrink: 0,
-              display: 'none',
             }}
           >
             <i className="fa fa-times" />

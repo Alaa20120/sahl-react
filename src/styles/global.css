@@ -551,8 +551,8 @@ tbody tr:hover td { background: #FAFBFC; }
     margin-top: 52px;
     padding: 16px;
     padding-bottom: 80px;
-    overflow-x: hidden;
-    max-width: 100vw;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   /* Page header stack vertically */
@@ -787,12 +787,88 @@ tbody tr:hover td { background: #FAFBFC; }
   }
 }
 
+/* ─── MOBILE GRID OVERRIDES ─────────────────────── */
+/* Force ALL grids to max 2 columns on mobile */
+@media (max-width: 768px) {
+  /* Override any inline gridTemplateColumns with > 2 cols */
+  [style*="repeat(3"],
+  [style*="repeat(4"],
+  [style*="repeat(5"],
+  [style*="repeat(6"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Stats grid always 2 cols max */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Single col for very small content */
+  [style*="repeat(1"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dynamic account grids */
+  [style*="accounts.length"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    flex-wrap: wrap;
+  }
+
+  /* Make all tables scroll horizontally */
+  .table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent any element from breaking viewport width */
+  .main > * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Card headers wrap on mobile */
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Page header actions wrap */
+  .page-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .page-header .flex {
+    flex-wrap: wrap;
+  }
+
+  /* Topbar buttons smaller */
+  .topbar-right, .topbar-left {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 1 column on very small screens */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  [style*="repeat(3"],
+  [style*="repeat(4"],
+  [style*="repeat(5"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
 /* ─── PWA / MOBILE ENHANCEMENTS ─────────────────── */
 
 /* Prevent text size adjustment on rotation */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+body {
+  overflow-x: hidden;
 }
 
 /* Smooth momentum scrolling on iOS */

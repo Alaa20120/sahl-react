@@ -11,6 +11,73 @@ import { printDelegateWithdrawalReceipt, printStockReceipt, printAccountStatemen
 import { toast } from '@/lib/toast'
 import { exportExcel } from '@/lib/excel'
 
+function exportDelegateInvoices(d: any, fmt: (n: number) => string) {
+  exportExcel({
+    title: `فواتير المندوب — ${d.name}`,
+    filename: `فواتير-${d.name}-${new Date().toISOString().slice(0,10)}`,
+    columns: [
+      { header: 'رقم الفاتورة', key: 'number', width: 18, type: 'text' as const, align: 'center' as const },
+      { header: 'التاريخ', key: 'date', width: 14, type: 'date' as const, align: 'center' as const },
+      { header: 'النوع', key: 'type', width: 10, type: 'text' as const, align: 'center' as const },
+      { header: 'الطرف', key: 'party', width: 24, type: 'text' as const },
+      { header: 'قبل الضريبة', key: 'subtotal', width: 16, type: 'currency' as const },
+      { header: 'الضريبة', key: 'tax', width: 12, type: 'currency' as const },
+      { header: 'الإجمالي', key: 'total', width: 16, type: 'currency' as const },
+      { header: 'المدفوع', key: 'paid', width: 14, type: 'currency' as const },
+      { header: 'المتبقي', key: 'remaining', width: 14, type: 'currency' as const },
+      { header: 'الحالة', key: 'status', width: 12, type: 'text' as const, align: 'center' as const },
+    ],
+    rows: d.invoices.map((inv: any) => ({
+      number: inv.number, date: inv.date,
+      type: inv.type === 'sale' ? 'بيع' : 'شراء',
+      party: inv.party,
+      subtotal: inv.subtotal, tax: inv.tax, total: inv.total,
+      paid: inv.paidAmount ?? 0,
+      remaining: inv.total - (inv.paidAmount ?? 0),
+      status: inv.status === 'paid' ? 'مدفوعة' : inv.status === 'confirmed' ? 'مؤكدة' : inv.status === 'pending' ? 'معلقة' : 'متأخرة',
+    })),
+    totals: {
+      number: `${d.invoices.length} فاتورة`, date: '', type: '', party: '',
+      subtotal: d.invoices.reduce((s: number, i: any) => s+i.subtotal, 0),
+      tax: d.invoices.reduce((s: number, i: any) => s+i.tax, 0),
+      total: d.invoices.reduce((s: number, i: any) => s+i.total, 0),
+      paid: d.invoices.reduce((s: number, i: any) => s+(i.paidAmount??0), 0),
+      remaining: d.invoices.reduce((s: number, i: any) => s+(i.total-(i.paidAmount??0)), 0),
+      status: '',
+    },
+  })
+}
+
+function exportDelegateStatement(d: any) {
+  exportExcel({
+    title: `كشف حساب — ${d.name}`,
+    filename: `كشف-${d.name}-${new Date().toISOString().slice(0,10)}`,
+    columns: [
+      { header: 'التاريخ', key: 'date', width: 14, type: 'date' as const, align: 'center' as const },
+      { header: 'نوع الحركة', key: 'type', width: 14, type: 'text' as const, align: 'center' as const },
+      { header: 'البيان', key: 'desc', width: 32, type: 'text' as const },
+      { header: 'المرجع', key: 'ref', width: 18, type: 'text' as const, align: 'center' as const },
+      { header: 'مدين (+)', key: 'debit', width: 14, type: 'currency' as const },
+      { header: 'دائن (-)', key: 'credit', width: 14, type: 'currency' as const },
+      { header: 'الرصيد', key: 'balance', width: 14, type: 'currency' as const },
+    ],
+    rows: d.transactions.map((tx: any) => ({
+      date: tx.date,
+      type: tx.type === 'collection' ? 'تحصيل' : tx.type === 'withdrawal' ? 'سحب' : tx.type === 'expense' ? 'مصروف' : tx.type === 'remittance' ? 'توريد' : 'عمولة',
+      desc: tx.description, ref: tx.reference ?? '—',
+      debit: tx.amount > 0 ? tx.amount : 0,
+      credit: tx.amount < 0 ? Math.abs(tx.amount) : 0,
+      balance: tx.balanceAfter,
+    })),
+    totals: {
+      date: '', type: '', desc: `${d.transactions.length} حركة`, ref: '',
+      debit: d.transactions.filter((t: any) => t.amount > 0).reduce((s: number, t: any) => s+t.amount, 0),
+      credit: d.transactions.filter((t: any) => t.amount < 0).reduce((s: number, t: any) => s+Math.abs(t.amount), 0),
+      balance: d.transactions.length > 0 ? d.transactions[d.transactions.length-1].balanceAfter : 0,
+    },
+  })
+}
+
 type Tab = 'overview' | 'warehouse' | 'invoices' | 'finance' | 'location'
 
 const INV_STATUS: Record<string, { label: string; css: string }> = {
@@ -188,6 +255,35 @@ export default function DelegateDetailPage() {
             <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Export buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <button className="btn btn-outline btn-sm" onClick={() => { exportDelegateInvoices(d, fmt); toast('تم تصدير الفواتير', 'success') }}>
+          <i className="fa fa-file-invoice" /> تصدير الفواتير Excel
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={() => { exportDelegateStatement(d); toast('تم تصدير كشف الحساب', 'success') }}>
+          <i className="fa fa-file-excel" /> كشف الحساب Excel
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={() => {
+          exportExcel({
+            title: `مستودع المندوب — ${d.name}`,
+            filename: `مستودع-${d.name}-${new Date().toISOString().slice(0,10)}`,
+            columns: [
+              { header: 'الصنف', key: 'productName', width: 28, type: 'text' },
+              { header: 'الكمية', key: 'qty', width: 12, type: 'number', align: 'center' },
+              { header: 'سعر التكلفة', key: 'costPrice', width: 16, type: 'currency' },
+              { header: 'الإجمالي', key: 'total', width: 16, type: 'currency' },
+              { header: 'المصدر', key: 'source', width: 14, type: 'text', align: 'center' },
+              { header: 'تاريخ الاستلام', key: 'date', width: 16, type: 'date', align: 'center' },
+            ],
+            rows: d.warehouse.map((w: any) => ({ productName: w.productName, qty: w.qty, costPrice: w.costPrice, total: w.qty*w.costPrice, source: w.source === 'company' ? 'عهدة شركة' : 'مشتريات', date: w.receivedDate })),
+            totals: { productName: `${d.warehouse.length} صنف`, qty: d.warehouse.reduce((s: number,w: any) => s+w.qty,0), costPrice: 0, total: d.warehouse.reduce((s: number,w: any) => s+w.qty*w.costPrice,0), source: '', date: '' },
+          })
+          toast('تم تصدير المستودع', 'success')
+        }}>
+          <i className="fa fa-warehouse" /> المستودع Excel
+        </button>
       </div>
 
       {/* Tabs */}

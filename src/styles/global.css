@@ -238,7 +238,11 @@ input, select, textarea { font-family: inherit; }
 .btn-icon { width: 34px; height: 34px; padding: 0; justify-content: center; }
 
 /* ─── TABLE ──────────────────────────────────────── */
-.table-wrap { overflow-x: auto; }
+.table-wrap {
+  overflow-x: auto;
+  overflow-y: visible; /* prevent trapping vertical page scroll */
+  -webkit-overflow-scrolling: touch;
+}
 table { width: 100%; border-collapse: collapse; }
 thead th {
   padding: 11px 16px; font-size: 12px; font-weight: 600;

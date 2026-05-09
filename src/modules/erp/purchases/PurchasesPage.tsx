@@ -153,8 +153,8 @@ export default function PurchasesPage() {
         amount: subtotal,
         tax,
         total,
-        paid: paymentMethod === 'cash' ? total : 0,
-        status: paymentMethod === 'cash' ? 'received' : 'pending',
+        paid: 0,
+        status: 'pending',
         lineItems: items.map(i => { const q = parseFloat(i.qty)||1; const p = parseFloat(i.price)||0; return { description: i.desc, productId: i.productId, qty: q, price: p, total: q*p } }),
         createdBy: createdBy || undefined,
       })

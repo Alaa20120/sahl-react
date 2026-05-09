@@ -891,8 +891,7 @@ html {
 }
 /* Prevent horizontal overflow without breaking vertical scroll */
 #root {
-  overflow-x: clip;
-  overflow-y: visible;
+  min-height: 100vh;
 }
 
 /* Smooth momentum scrolling on iOS */

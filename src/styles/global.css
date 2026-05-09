@@ -309,6 +309,7 @@ tbody tr:hover td { background: #FAFBFC; }
 .divider { height: 1px; background: var(--border); margin: 20px 0; }
 
 /* ─── GRID HELPERS ───────────────────────────────── */
+.grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; }

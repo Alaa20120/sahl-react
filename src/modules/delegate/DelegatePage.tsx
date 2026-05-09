@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '@/components/ui/PageHeader'
+import { useIsMobile } from '@/lib/useIsMobile'
 import Card from '@/components/ui/Card'
 import StatCard from '@/components/ui/StatCard'
 import { fmt, fmtNum, fmtDate } from '@/lib/format'
@@ -19,6 +20,7 @@ const INV_STATUS: Record<string, { label: string; css: string }> = {
 
 export default function DelegatePage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const user = useAuthStore(s => s.user)
   const delegateId = user?.delegateId || ''
   const delegates = useDelegateStore(s => s.delegates)
@@ -257,7 +259,7 @@ export default function DelegatePage() {
       </div>
 
       {tab === 'overview' && (
-        <div className="grid-2">
+        <div className={isMobile ? 'grid-1' : 'grid-2'}>
           <Card title="آخر الفواتير" action={<button className="btn btn-sm btn-outline" onClick={() => setTab('invoices')}>عرض الكل</button>}>
             {/* Desktop */}
             <div className="desktop-only">
@@ -481,7 +483,7 @@ export default function DelegatePage() {
               </div>
             </div>
 
-            <div className="grid-2">
+            <div className={isMobile ? 'grid-1' : 'grid-2'}>
               {/* Custody breakdown */}
               <Card title="تحليل العهدة المالية">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '4px 0' }}>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '@/components/ui/PageHeader'
+import { useIsMobile } from '@/lib/useIsMobile'
 import Modal from '@/components/ui/Modal'
 import { fmt, fmtNum, fmtDate } from '@/lib/format'
 import { useDelegateStore } from '@/store/delegate.store'
@@ -29,6 +30,7 @@ const TX_TYPE: Record<string, { label: string; color: string; icon: string }> = 
 export default function DelegateDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const delegates = useDelegateStore(s => s.delegates)
   const withdrawFromDelegate = useDelegateStore(s => s.withdrawFromDelegate)
   const transferToMainWarehouse = useDelegateStore(s => s.transferToMainWarehouse)
@@ -168,7 +170,7 @@ export default function DelegateDetailPage() {
       />
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'إجمالي المبيعات', value: fmt(totalSales), color: 'var(--success)', icon: 'fa-chart-line' },
           { label: 'إجمالي المشتريات', value: fmt(totalPurchases), color: 'var(--blue)', icon: 'fa-shopping-cart' },
@@ -198,7 +200,7 @@ export default function DelegateDetailPage() {
 
       {/* ── Overview Tab ── */}
       {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
           {/* Info card */}
           <div className="card">
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>
@@ -373,7 +375,7 @@ export default function DelegateDetailPage() {
 
       {/* ── Finance Tab ── */}
       {tab === 'finance' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 360px', gap: 20 }}>
           {/* Left — Transactions + Unpaid Invoices */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Unpaid invoices — actionable */}
@@ -519,7 +521,7 @@ export default function DelegateDetailPage() {
 
       {/* ── Location Tab ── */}
       {tab === 'location' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
           <div className="card">
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>
               <i className="fa fa-map-marker-alt" style={{ marginLeft: 8, color: 'var(--danger)' }} /> الموقع الحالي

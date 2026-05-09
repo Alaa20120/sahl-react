@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fmt } from '@/lib/format'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { CUSTOMERS } from '@/lib/mock-data/customers'
 import { PRODUCTS, type Product } from '@/lib/mock-data/inventory'
 import { useInvoiceStore } from '@/store/invoice.store'
@@ -123,6 +124,7 @@ export default function InvoiceNewPage() {
   const navigate = useNavigate()
   const { nextNumber, addInvoice } = useInvoiceStore()
   const user = useAuthStore(s => s.user)
+  const isMobile = useIsMobile()
 
   const today = new Date().toISOString().split('T')[0]
   const due30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
@@ -212,7 +214,7 @@ export default function InvoiceNewPage() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: 16, alignItems: 'start' }}>
         {/* Left — main form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -221,7 +223,7 @@ export default function InvoiceNewPage() {
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: 'var(--muted)' }}>
               <i className="fa fa-user" style={{ marginLeft: 6 }} />بيانات العميل والتواريخ
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 14 }}>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>العميل *</label>
                 <select className="form-control" value={customerId} onChange={e => setCustomerId(e.target.value)}>
@@ -316,15 +318,17 @@ export default function InvoiceNewPage() {
               <i className="fa fa-list" style={{ marginLeft: 6 }} />الأصناف والخدمات
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px 120px 36px', gap: 8, marginBottom: 8, padding: '0 2px' }}>
-              {['الوصف', 'الكمية', 'سعر الوحدة', 'الإجمالي', ''].map(h => (
-                <div key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{h}</div>
-              ))}
-            </div>
+            {!isMobile && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px 120px 36px', gap: 8, marginBottom: 8, padding: '0 2px' }}>
+                {['الوصف', 'الكمية', 'سعر الوحدة', 'الإجمالي', ''].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{h}</div>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {items.map((item, idx) => (
-                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px 120px 36px', gap: 8, alignItems: 'center' }}>
+                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 70px 70px 36px' : '1fr 80px 120px 120px 36px', gap: 8, alignItems: 'center' }}>
                   <ProductPicker
                     value={item.desc}
                     placeholder={`الصنف أو الخدمة ${idx + 1}...`}

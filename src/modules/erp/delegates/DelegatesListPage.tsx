@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal'
 import { fmt, fmtNum } from '@/lib/format'
 import { useDelegateStore } from '@/store/delegate.store'
 import { toast } from '@/lib/toast'
+import { exportExcel } from '@/lib/excel'
 
 /* ── Saudi Arabia SVG ── */
 const SA_CITIES: { name: string; x: number; y: number }[] = [
@@ -73,9 +74,59 @@ export default function DelegatesListPage() {
         title="إدارة المندوبين"
         subtitle={`${totalDelegates} مندوب — ${activeDelegates} نشط`}
         actions={
+          <>
+          <button className="btn btn-outline btn-sm" onClick={() => {
+            // Export all delegates warehouse report
+            const rows: any[] = []
+            delegates.forEach(d => {
+              d.warehouse.forEach(item => {
+                rows.push({
+                  delegate: d.name,
+                  zone: d.zone,
+                  product: item.productName,
+                  sku: item.productSku || '',
+                  qty: item.qty,
+                  costPrice: item.costPrice,
+                  total: item.qty * item.costPrice,
+                  status: item.status === 'in-stock' ? 'في المستودع' : item.status === 'reserved' ? 'محجوز' : 'محول',
+                  source: item.source === 'company' ? 'من الشركة' : 'مشتريات',
+                  date: item.receivedDate,
+                })
+              })
+            })
+            exportExcel({
+              title: 'تقرير مستودعات المندوبين',
+              filename: `مستودعات-المندوبين-${new Date().toISOString().slice(0,10)}`,
+              columns: [
+                { header: 'المندوب', key: 'delegate', width: 20, type: 'text' },
+                { header: 'المنطقة', key: 'zone', width: 16, type: 'text' },
+                { header: 'المنتج', key: 'product', width: 28, type: 'text' },
+                { header: 'الكود', key: 'sku', width: 18, type: 'text', align: 'center' },
+                { header: 'الكمية', key: 'qty', width: 12, type: 'number', align: 'center' },
+                { header: 'سعر التكلفة', key: 'costPrice', width: 16, type: 'currency' },
+                { header: 'إجمالي القيمة', key: 'total', width: 18, type: 'currency' },
+                { header: 'الحالة', key: 'status', width: 14, type: 'text', align: 'center' },
+                { header: 'المصدر', key: 'source', width: 14, type: 'text', align: 'center' },
+                { header: 'تاريخ الاستلام', key: 'date', width: 16, type: 'date', align: 'center' },
+              ],
+              rows,
+              totals: rows.length > 0 ? {
+                delegate: `${delegates.length} مندوب`,
+                zone: '', product: `${rows.length} صنف`, sku: '',
+                qty: rows.reduce((s,r) => s + r.qty, 0),
+                costPrice: 0,
+                total: rows.reduce((s,r) => s + r.total, 0),
+                status: '', source: '', date: '',
+              } : undefined,
+            })
+            toast('تم تصدير التقرير بنجاح', 'success')
+          }}>
+            <i className="fa fa-file-excel" /> تصدير المستودعات
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
             <i className="fa fa-plus" /> إضافة مندوب
           </button>
+          </>
         }
       />
 

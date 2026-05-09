@@ -80,8 +80,9 @@ input, select, textarea { font-family: inherit; }
 }
 .sidebar-nav {
   flex: 1;
+  min-height: 0; /* critical for flexbox scroll */
   padding: 12px 0;
-  overflow-y: auto; /* only nav scrolls */
+  overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;

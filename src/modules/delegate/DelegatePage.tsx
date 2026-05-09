@@ -78,19 +78,28 @@ export default function DelegatePage() {
     ? parties.filter((p: any) => p.name.includes(partySearch) || p.phone.includes(partySearch))
     : parties
 
+  // Aggregate warehouse by productId — sum quantities across multiple entries
   const availableProducts = newInvType === 'sale'
-    ? delegateWarehouse.map((w: any) => {
-        const catalogProduct = PRODUCTS.find((pr: any) => pr.id === w.productId)
-        return {
-          id: w.productId,
-          name: catalogProduct?.name || w.productName,
-          sku: catalogProduct?.sku || w.productSku,
-          category: catalogProduct?.category || '',
-          sellPrice: catalogProduct?.sellPrice || w.costPrice,
-          costPrice: w.costPrice,
-          whQty: w.qty,
-        }
-      })
+    ? (() => {
+        const grouped: Record<string, any> = {}
+        delegateWarehouse.forEach((w: any) => {
+          if (!w.productId) return
+          if (!grouped[w.productId]) {
+            const catalogProduct = PRODUCTS.find((pr: any) => pr.id === w.productId)
+            grouped[w.productId] = {
+              id: w.productId,
+              name: catalogProduct?.name || w.productName,
+              sku: catalogProduct?.sku || w.productSku,
+              category: catalogProduct?.category || '',
+              sellPrice: catalogProduct?.sellPrice || w.costPrice,
+              costPrice: w.costPrice,
+              whQty: 0,
+            }
+          }
+          grouped[w.productId].whQty += w.qty
+        })
+        return Object.values(grouped).filter((p: any) => p.whQty > 0)
+      })()
     : PRODUCTS.map((p: any) => ({ ...p, whQty: undefined }))
   const filteredProducts = productSearch.trim()
     ? (availableProducts as any[]).filter((p: any) =>
@@ -149,9 +158,10 @@ export default function DelegatePage() {
       toast('أكمل بيانات جميع الأصناف', 'warn'); return
     }
 
-    const subtotal = newItems.reduce((s, it) => s + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0), 0)
-    const tax = subtotal * 0.15
-    const total = subtotal + tax
+    // Prices are VAT-inclusive — extract 15% from total
+    const total = newItems.reduce((s, it) => s + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0), 0)
+    const tax = Math.round(total * 15 / 115 * 100) / 100
+    const subtotal = Math.round((total - tax) * 100) / 100
 
     // For sales: invoice is pending until confirmed (warehouse deduction happens at confirmation)
     // For cash sales: treat as immediately confirmed (deduct warehouse now)
@@ -620,22 +630,29 @@ export default function DelegatePage() {
                 )}
               </div>
 
-              {/* Totals */}
-              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '16px 20px', marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                  <span style={{ color: 'var(--muted)' }}>الإجمالي</span>
-                  <span style={{ fontWeight: 700 }}>{fmt(newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0))}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                  <span style={{ color: 'var(--muted)' }}>الضريبة (15%)</span>
-                  <span style={{ fontWeight: 700 }}>{fmt(newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0) * 0.15)}</span>
-                </div>
-                <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
-                  <span>الصافي</span>
-                  <span style={{ color: 'var(--primary)' }}>{fmt(newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0) * 1.15)}</span>
-                </div>
-              </div>
+              {/* Totals - VAT inclusive */}
+              {(() => {
+                const _total = newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0)
+                const _tax = Math.round(_total * 15 / 115 * 100) / 100
+                const _net = Math.round((_total - _tax) * 100) / 100
+                return (
+                  <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '16px 20px', marginBottom: 20 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                      <span style={{ color: 'var(--muted)' }}>الإجمالي شامل الضريبة</span>
+                      <span style={{ fontWeight: 700 }}>{fmt(_total)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                      <span style={{ color: 'var(--muted)' }}>ضريبة القيمة المضافة المستخرجة (15%)</span>
+                      <span style={{ fontWeight: 700, color: 'var(--warn)' }}>- {fmt(_tax)}</span>
+                    </div>
+                    <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
+                      <span>صافي قبل الضريبة</span>
+                      <span style={{ color: 'var(--primary)' }}>{fmt(_net)}</span>
+                    </div>
+                  </div>
+                )
+              })()}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleCreateInvoice}>
                   <i className="fa fa-save" /> حفظ الفاتورة

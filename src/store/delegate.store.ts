@@ -170,8 +170,19 @@ export const useDelegateStore = create<DelegateStore>()(
 
       async addInvoice(delegateId, invoice) {
         const year = new Date().getFullYear()
-        const count = (get().delegates.find(d => d.id === delegateId)?.invoices.length || 0) + 1
-        const newInvoice: DelegateInvoice = { ...invoice, id: `DINV-${Date.now()}`, number: `D-${year}-${String(count).padStart(3, '0')}` }
+        const prefix = `D-${year}-`
+        // Get real max from Supabase to avoid duplicates
+        let seq = (get().delegates.find(d => d.id === delegateId)?.invoices.length || 0) + 1
+        if (isSupabaseConfigured()) {
+          try {
+            const rows = await supaFetch('delegate_invoices', { select: 'number', filter: `delegate_id=eq.${delegateId}`, limit: 500 })
+            if (Array.isArray(rows) && rows.length > 0) {
+              const max = rows.map((r: any) => parseInt((r.number || '').replace(prefix, '')) || 0).reduce((a: number, b: number) => Math.max(a, b), 0)
+              seq = max + 1
+            }
+          } catch { /* use local count */ }
+        }
+        const newInvoice: DelegateInvoice = { ...invoice, id: `DINV-${Date.now()}`, number: `${prefix}${String(seq).padStart(3, '0')}` }
 
         if (isSupabaseConfigured()) {
           const { data: inserted } = await supabase.from('delegate_invoices').insert({

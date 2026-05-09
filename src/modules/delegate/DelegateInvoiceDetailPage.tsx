@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { fmt, fmtDate } from '@/lib/format'
 import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/store/auth.store'
@@ -32,6 +33,7 @@ export default function DelegateInvoiceDetailPage() {
 
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
   const co = useAppStore(s => s.company)
+  const isMobile = useIsMobile()
   const delegate = useMemo(() => delegates.find(d => d.id === delegateId), [delegates, delegateId])
   const invoice = useMemo(() => delegate?.invoices.find(inv => inv.id === id), [delegate, id])
 
@@ -124,7 +126,7 @@ export default function DelegateInvoiceDetailPage() {
       </div>
 
       {/* Company + Delegate info banner */}
-      <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div style={{ background: 'var(--primary)', color: '#fff', borderRadius: 12, padding: '16px 20px' }}>
           <div style={{ fontSize: 11, opacity: .6, marginBottom: 6 }}>البائع / الشركة</div>
           <div style={{ fontSize: 16, fontWeight: 800 }}>{co.name || 'اسم الشركة'}</div>
@@ -148,7 +150,7 @@ export default function DelegateInvoiceDetailPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 300px', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 16, alignItems: 'start' }}>
         {/* Main content */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 

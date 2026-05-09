@@ -11,7 +11,7 @@ import { generateZATCAQR, COMPANY_INFO, type ZATCAInvoiceData } from './tlv'
 import { generateZATCAXML } from './xml-generator'
 import { hashInvoice, signInvoiceHash, generateUUID } from './signature'
 
-const _ZATCA_SANDBOX_URL = 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal'
+// const ZATCA_SANDBOX_URL = 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal'
 // const ZATCA_PRODUCTION_URL = 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core'
 
 export interface ZATCASubmitResult {

@@ -420,43 +420,91 @@ export default function DelegateDetailPage() {
               </button>
             </div>
           </div>
-          {d.warehouse.length === 0 ? (
-            <div className="empty-state">
-              <i className="fa fa-box-open empty-state-icon" />
-              <div className="empty-state-title">المستودع فارغ</div>
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>الصنف</th><th>الكود</th><th>الكمية</th><th>سعر التكلفة</th><th>الإجمالي</th><th>تاريخ الاستلام</th><th>المصدر</th><th>إجراء</th></tr>
-                </thead>
-                <tbody>
-                  {d.warehouse.map(w => (
-                    <tr key={w.id}>
-                      <td style={{ fontWeight: 600 }}>{w.productName}</td>
-                      <td><span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--blue)' }}>{w.productSku}</span></td>
-                      <td style={{ fontWeight: 700 }}>{fmtNum(w.qty)}</td>
-                      <td>{fmt(w.costPrice)}</td>
-                      <td style={{ fontWeight: 700 }}>{fmt(w.qty * w.costPrice)}</td>
-                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(w.receivedDate)}</td>
-                      <td>
-                        {w.source === 'company'
-                          ? <span style={{ background: '#FFF7ED', color: 'var(--warn)', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>عهدة شركة</span>
-                          : <span style={{ background: 'var(--bg)', color: 'var(--muted)', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>مشتريات</span>
-                        }
-                      </td>
-                      <td>
-                        <button className="btn btn-primary btn-sm" onClick={() => handleTransfer(w.id, w.qty, w.productName, w.costPrice)}>
-                          <i className="fa fa-exchange-alt" /> تحويل للمخزن
-                        </button>
-                      </td>
+          {(() => {
+            // Aggregate by product + subtract sold
+            const soldQty: Record<string, number> = {}
+            d.invoices
+              .filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
+              .forEach(inv => inv.items.forEach((it: any) => {
+                if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
+              }))
+
+            const grouped: Record<string, { name: string; sku: string; cost: number; received: number; ids: string[] }> = {}
+            d.warehouse.forEach(w => {
+              const key = w.productId || w.productName
+              if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, received: 0, ids: [] }
+              grouped[key].received += w.qty
+              grouped[key].ids.push(w.id)
+            })
+
+            const rows = Object.entries(grouped).map(([key, r]) => ({
+              key, ...r,
+              sold: soldQty[key] || 0,
+              available: Math.max(0, r.received - (soldQty[key] || 0)),
+            }))
+
+            if (rows.length === 0) return (
+              <div className="empty-state">
+                <i className="fa fa-box-open empty-state-icon" />
+                <div className="empty-state-title">المستودع فارغ</div>
+              </div>
+            )
+
+            return (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>الصنف</th>
+                      <th style={{ textAlign: 'center' }}>المستلم</th>
+                      <th style={{ textAlign: 'center', color: 'var(--danger)' }}>المباع</th>
+                      <th style={{ textAlign: 'center', color: 'var(--success)' }}>المتوفر</th>
+                      <th>سعر التكلفة</th>
+                      <th>قيمة المتوفر</th>
+                      <th>إجراء (أدمن فقط)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {rows.map(r => (
+                      <tr key={r.key}>
+                        <td style={{ fontWeight: 600 }}>{r.name}</td>
+                        <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{fmtNum(r.received)}</td>
+                        <td style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{r.sold > 0 ? fmtNum(r.sold) : '—'}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
+                        <td>{fmt(r.cost)}</td>
+                        <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
+                        <td>
+                          {r.available > 0 && (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (r.ids[0]) handleTransfer(r.ids[0], r.available, r.name, r.cost)
+                              }}
+                            >
+                              <i className="fa fa-exchange-alt" /> تحويل للمخزن
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
+                      <td>الإجمالي</td>
+                      <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + r.received, 0))}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{fmtNum(rows.reduce((s, r) => s + r.sold, 0))}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--success)' }}>{fmtNum(rows.reduce((s, r) => s + r.available, 0))}</td>
+                      <td></td>
+                      <td>{fmt(rows.reduce((s, r) => s + r.available * r.cost, 0))}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )
+          })()}
         </div>
       )}
 

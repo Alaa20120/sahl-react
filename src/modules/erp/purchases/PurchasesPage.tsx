@@ -96,7 +96,7 @@ export default function PurchasesPage() {
   const [selected, setSelected] = useState<string[]>([])
 
   // New PO form
-  const [supplierId, setSupplierId] = useState(SUPPLIERS[0]?.id ?? '')
+  const [supplierId, setSupplierId] = useState('')
   const [showCustom, setShowCustom] = useState(false)
   const [customSupplier, setCustomSupplier] = useState('')
   const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0])
@@ -106,6 +106,14 @@ export default function PurchasesPage() {
   const [createdBy, setCreatedBy] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<LineItem[]>([{ id: 1, desc: '', qty: '1', price: '' }])
+  const [saveError, setSaveError] = useState('')
+
+  // Auto-select first supplier when data loads
+  useEffect(() => {
+    if (!supplierId && SUPPLIERS.length > 0) {
+      setSupplierId(SUPPLIERS[0].id)
+    }
+  }, [SUPPLIERS.length])
 
   const selectedSupplier = SUPPLIERS.find((s: any) => s.id === supplierId)
   const supplierName = showCustom ? customSupplier : (selectedSupplier?.name ?? '')
@@ -129,10 +137,11 @@ export default function PurchasesPage() {
   }
 
   const handleSave = () => {
-    if (!supplierName.trim()) { toast('يرجى اختيار أو إدخال اسم المورد', 'warn'); return }
-    if (items.length === 0) { toast('أضف صنفاً واحداً على الأقل', 'warn'); return }
+    setSaveError('')
+    if (!supplierName.trim()) { setSaveError('يرجى اختيار مورد أو إدخال اسمه'); return }
+    if (items.length === 0) { setSaveError('أضف صنفاً واحداً على الأقل'); return }
     const hasEmpty = items.some(i => !i.desc.trim())
-    if (hasEmpty) { toast('يرجى ملء وصف جميع الأصناف', 'warn'); return }
+    if (hasEmpty) { setSaveError('يرجى ملء وصف جميع الأصناف'); return }
 
     run(async () => {
       await addPurchase({
@@ -152,7 +161,7 @@ export default function PurchasesPage() {
       toast('تم إنشاء أمر الشراء بنجاح', 'success')
       setShowNew(false)
       resetForm()
-    }).catch((err: any) => toast(`خطأ: ${err?.message || 'فشل الحفظ — حاول مرة أخرى'}`, 'danger'))
+    }).catch((err: any) => setSaveError(err?.message || 'فشل الحفظ — تحقق من الاتصال وحاول مرة أخرى'))
   }
 
   const filtered = purchases.filter(p => {
@@ -456,6 +465,14 @@ export default function PurchasesPage() {
             <textarea className="form-control" rows={2} value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="ملاحظات الأمر..." style={{ resize: 'none' }} />
           </div>
+
+          {/* Error box */}
+          {saveError && (
+            <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <i className="fa fa-exclamation-circle" />
+              {saveError}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>

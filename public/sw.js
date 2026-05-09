@@ -1,10 +1,9 @@
-const CACHE = 'sahl-v2'
-const BASE = '/sahl-react'
-const OFFLINE_PAGE = BASE + '/'
+const CACHE = 'sahl-v3'
+const OFFLINE_PAGE = '/'
 
 const PRECACHE = [
-  BASE + '/',
-  BASE + '/favicon.svg',
+  '/',
+  '/favicon.svg',
 ]
 
 self.addEventListener('install', e => {

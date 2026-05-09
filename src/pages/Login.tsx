@@ -74,7 +74,7 @@ export default function Login() {
         })
         setLoginAttempts(0)
         // Force hard navigation to avoid React Router issues
-        window.location.href = '/sahl-react/erp/dashboard'
+        window.location.href = '/erp/dashboard'
 
       } else {
         // Delegate login

@@ -147,7 +147,7 @@ function PWAInstallButton() {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/sahl-react">
+    <BrowserRouter basename="/">
       <AppDataProvider />
       <PWAInstallButton />
       <Routes>

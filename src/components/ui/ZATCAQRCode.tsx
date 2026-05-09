@@ -11,7 +11,7 @@ interface Props {
 }
 
 function buildViewUrl(invoiceNumber: string): string {
-  const base = window.location.origin + '/sahl-react/invoice/' + encodeURIComponent(invoiceNumber)
+  const base = window.location.origin + '/invoice/' + encodeURIComponent(invoiceNumber)
   return base
 }
 

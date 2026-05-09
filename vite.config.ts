@@ -29,7 +29,7 @@ export default defineConfig({
       },
     }),
   ],
-  base: '/sahl-react/',
+  base: '/',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

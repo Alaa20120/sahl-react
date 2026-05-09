@@ -4,14 +4,11 @@ import { Theme } from '@radix-ui/themes'
 import './styles/global.css'
 import App from './App.tsx'
 
-// Handle GitHub Pages SPA redirect
+// Handle SPA redirect (from 404.html)
 const savedRoute = sessionStorage.getItem('gh-pages-route')
 if (savedRoute) {
   sessionStorage.removeItem('gh-pages-route')
-  const base = '/sahl-react/'
-  if (window.location.pathname === base || window.location.pathname === base.slice(0, -1)) {
-    window.history.replaceState(null, '', base + savedRoute)
-  }
+  window.history.replaceState(null, '', '/' + savedRoute)
 }
 
 createRoot(document.getElementById('root')!).render(

@@ -2,15 +2,15 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/sahl-react/favicon.svg" />
-    <link rel="manifest" href="/sahl-react/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <meta name="theme-color" content="#0D1117" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="سهل" />
-    <link rel="apple-touch-icon" href="/sahl-react/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="description" content="نظام ERP عربي متكامل لإدارة الفواتير والمخزون والموارد البشرية" />
     <meta name="application-name" content="سهل ERP" />
     <title>سهل — نظام ERP عربي متكامل</title>
@@ -36,7 +36,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sahl-react/sw.js')
+          navigator.serviceWorker.register('/sw.js')
             .then((reg) => console.log('SW registered:', reg.scope))
             .catch((err) => console.log('SW registration failed:', err))
         })

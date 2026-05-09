@@ -130,8 +130,9 @@ export default function PurchasesPage() {
 
   const handleSave = () => {
     if (!supplierName.trim()) { toast('يرجى اختيار أو إدخال اسم المورد', 'warn'); return }
-    const hasEmpty = items.some(i => !i.desc || !(parseFloat(i.price) > 0))
-    if (hasEmpty) { toast('يرجى ملء جميع بنود الأصناف', 'warn'); return }
+    if (items.length === 0) { toast('أضف صنفاً واحداً على الأقل', 'warn'); return }
+    const hasEmpty = items.some(i => !i.desc.trim())
+    if (hasEmpty) { toast('يرجى ملء وصف جميع الأصناف', 'warn'); return }
 
     run(async () => {
       await addPurchase({
@@ -151,7 +152,7 @@ export default function PurchasesPage() {
       toast('تم إنشاء أمر الشراء بنجاح', 'success')
       setShowNew(false)
       resetForm()
-    })
+    }).catch((err: any) => toast(`خطأ: ${err?.message || 'فشل الحفظ — حاول مرة أخرى'}`, 'danger'))
   }
 
   const filtered = purchases.filter(p => {

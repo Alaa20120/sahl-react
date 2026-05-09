@@ -47,7 +47,7 @@ const DEFAULT_COMPANY: CompanyInfo = {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       company: DEFAULT_COMPANY,
       currency: 'SAR',
       vatRate: 15,

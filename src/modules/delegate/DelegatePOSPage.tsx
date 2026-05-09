@@ -131,9 +131,9 @@ export default function DelegatePOSPage() {
   const tax = subtotal * 0.15
   const total = subtotal + tax
 
-  function handleAddCustomerSubmit() {
+  async function handleAddCustomerSubmit() {
     if (!newCustomerName.trim()) { toast('أدخل اسم العميل', 'warn'); return }
-    const created = addCustomer({
+    const created = await addCustomer({
       name: newCustomerName,
       type: 'customer',
       phone: newCustomerPhone || 'غير محدد',
@@ -151,7 +151,7 @@ export default function DelegatePOSPage() {
     setNewCustomerPhone('')
   }
 
-  function handleCheckout() {
+  async function handleCheckout() {
     if (cart.length === 0) { toast('سلة المشتريات فارغة', 'warn'); return }
     if (!customerName.trim()) { toast('أدخل اسم العميل', 'warn'); return }
 
@@ -171,7 +171,7 @@ export default function DelegatePOSPage() {
     }
 
     // Create invoice in delegate store
-    const inv = addInvoice(delegateId, {
+    const inv = await addInvoice(delegateId, {
       date: new Date().toISOString().slice(0, 10),
       type: 'sale',
       party: customerName,

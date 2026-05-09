@@ -14,10 +14,10 @@ const TEMPLATE_KEY = 'sahl-inv-template'
 const getTemplate = () => (localStorage.getItem(TEMPLATE_KEY) as TplId) ?? 'classic'
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
-  paid: 'var(--success)', partial: 'var(--blue)', confirmed: 'var(--primary)', pending: 'var(--warn)', overdue: 'var(--danger)', draft: 'var(--muted)',
+  paid: 'var(--success)', partial: 'var(--blue)', confirmed: 'var(--primary)', pending: 'var(--warn)', overdue: 'var(--danger)', draft: 'var(--muted)', returned: 'var(--danger)',
 }
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  paid: 'مدفوع', partial: 'جزئي', confirmed: 'مؤكد', pending: 'معلق', overdue: 'متأخر', draft: 'مسودة',
+  paid: 'مدفوع', partial: 'جزئي', confirmed: 'مؤكد', pending: 'معلق', overdue: 'متأخر', draft: 'مسودة', returned: 'مرتجع',
 }
 
 const TEMPLATES: { id: TplId; name: string; headerBg: string; headerColor: string; accentColor: string; borderTop?: string }[] = [

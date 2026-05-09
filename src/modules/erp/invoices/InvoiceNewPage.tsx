@@ -4,7 +4,6 @@ import { fmt } from '@/lib/format'
 import { CUSTOMERS } from '@/lib/mock-data/customers'
 import { PRODUCTS, type Product } from '@/lib/mock-data/inventory'
 import { useInvoiceStore } from '@/store/invoice.store'
-import { useCustomerStore } from '@/store/customer.store'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/lib/toast'
 import type { PaymentMethod } from '@/lib/mock-data/invoices'
@@ -124,7 +123,6 @@ export default function InvoiceNewPage() {
   const navigate = useNavigate()
   const { nextNumber, addInvoice } = useInvoiceStore()
   const user = useAuthStore(s => s.user)
-  const { updateBalance } = useCustomerStore()
 
   const today = new Date().toISOString().split('T')[0]
   const due30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]

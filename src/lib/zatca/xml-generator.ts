@@ -24,7 +24,7 @@ export interface ZATCAXMLInput {
 }
 
 export function generateZATCAXML(input: ZATCAXMLInput): string {
-  const { invoice, uuid, invoiceHash, digitalSignature, publicKey, certificate } = input
+  const { invoice, uuid, invoiceHash, digitalSignature, publicKey: _publicKey, certificate } = input
   const now = new Date()
   const issueDate = invoice.date
   const issueTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`

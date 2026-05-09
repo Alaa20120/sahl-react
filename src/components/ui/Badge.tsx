@@ -1,4 +1,4 @@
-type StatusKey = 'paid' | 'pending' | 'overdue' | 'draft' | 'confirmed' | 'partial' | 'active' | 'inactive' | 'leave'
+type StatusKey = 'paid' | 'pending' | 'overdue' | 'draft' | 'confirmed' | 'partial' | 'active' | 'inactive' | 'leave' | 'returned'
 
 const LABELS: Record<StatusKey, string> = {
   paid: 'مدفوع',
@@ -10,6 +10,7 @@ const LABELS: Record<StatusKey, string> = {
   active: 'نشط',
   inactive: 'غير نشط',
   leave: 'إجازة',
+  returned: 'مرتجع',
 }
 
 interface Props {

@@ -15,7 +15,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState('الشركة')
   const [logo, setLogo] = useState<string | null>(storeCompany.logo)
   const [company, setCompany] = useState({ ...storeCompany })
-  const [invoiceNotes, setLocalNotes] = useState(storeNotes)
+  const [invoiceNotes, _setLocalNotes] = useState(storeNotes)
   const [invoice, setInvoice] = useState({
     prefix: 'INV',
     nextNum: 1,
@@ -108,7 +108,7 @@ export default function SettingsPage() {
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>{f.label}</label>
-                  <input className="form-control" value={company[f.key as keyof typeof company]}
+                  <input className="form-control" value={company[f.key as keyof typeof company] ?? ''}
                     onChange={e => setCompany(prev => ({ ...prev, [f.key]: e.target.value }))} />
                 </div>
               ))}

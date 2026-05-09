@@ -117,11 +117,11 @@ export default function DelegatePage() {
     setProductSearch('')
   }
 
-  function handleAddPartySubmit() {
+  async function handleAddPartySubmit() {
     if (!newPartyName.trim()) { toast('أدخل الاسم', 'warn'); return }
     const vatEl = document.getElementById('delegate-party-vat') as HTMLInputElement | null
     const crEl = document.getElementById('delegate-party-cr') as HTMLInputElement | null
-    const created = addCustomer({
+    const created = await addCustomer({
       name: newPartyName,
       type: newInvType === 'sale' ? 'customer' : 'supplier',
       phone: newPartyPhone || 'غير محدد',
@@ -141,9 +141,9 @@ export default function DelegatePage() {
     setNewPartyPhone('')
   }
 
-  function handleCreateInvoice() {
+  async function handleCreateInvoice() {
     if (!newParty.trim()) { toast('أدخل اسم الطرف', 'warn'); return }
-    if (newItems.length === 0 || newItems.some(it => !it.productId || it.qty <= 0)) {
+    if (newItems.length === 0 || newItems.some(it => !it.productId || (parseFloat(it.qty) || 0) <= 0)) {
       toast('أكمل بيانات جميع الأصناف', 'warn'); return
     }
 
@@ -157,14 +157,14 @@ export default function DelegatePage() {
 
     if (isCashSale) {
       for (const item of newItems) {
-        const ok = deductFromWarehouse(delegateId, item.productId, item.qty)
+        const ok = deductFromWarehouse(delegateId, item.productId, parseFloat(item.qty) || 0)
         if (!ok) { toast(`الكمية غير متوفرة في المستودع لـ "${item.desc}"`, 'danger'); return }
       }
       const catalogItems = newItems.filter(it => PRODUCTS.some((p: any) => p.id === it.productId))
-      if (catalogItems.length > 0) deductFromInventory(catalogItems.map(it => ({ productId: it.productId, qty: it.qty })))
+      if (catalogItems.length > 0) deductFromInventory(catalogItems.map(it => ({ productId: it.productId, qty: parseFloat(it.qty) || 0 })))
     }
 
-    const inv = addInvoice(delegateId, {
+    const inv = await addInvoice(delegateId, {
       date: new Date().toISOString().slice(0, 10),
       type: newInvType,
       party: newParty,
@@ -192,7 +192,7 @@ export default function DelegatePage() {
           productId: item.productId || `PROD-${Date.now()}`,
           productName: item.desc,
           productSku: catalogProduct?.sku || item.productId || '',
-          qty: item.qty,
+          qty: parseFloat(item.qty) || 0,
           costPrice: parseFloat(item.price) || 0,
           receivedDate: new Date().toISOString().slice(0, 10),
           source: 'purchased',
@@ -626,12 +626,12 @@ export default function DelegatePage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                   <span style={{ color: 'var(--muted)' }}>الضريبة (15%)</span>
-                  <span style={{ fontWeight: 700 }}>{fmt(newItems.reduce((s, it) => s + it.qty * it.price, 0) * 0.15)}</span>
+                  <span style={{ fontWeight: 700 }}>{fmt(newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0) * 0.15)}</span>
                 </div>
                 <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
                   <span>الصافي</span>
-                  <span style={{ color: 'var(--primary)' }}>{fmt(newItems.reduce((s, it) => s + it.qty * it.price, 0) * 1.15)}</span>
+                  <span style={{ color: 'var(--primary)' }}>{fmt(newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0) * 1.15)}</span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>

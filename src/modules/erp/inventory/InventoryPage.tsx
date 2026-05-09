@@ -258,9 +258,9 @@ export default function InventoryPage() {
             <i className="fa fa-exclamation-triangle" style={{ color: 'var(--danger)', fontSize: 18 }} />
             <strong>تنبيه: منتجات وصلت للحد الأدنى ({lowStock.length} منتج)</strong>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4, WebkitOverflowScrolling: 'touch' as any }}>
             {lowStock.map(p => (
-              <span key={p.id} style={{ background: '#FEE2E2', color: '#991B1B', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span key={p.id} style={{ background: '#FEE2E2', color: '#991B1B', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 {p.name}
                 <span style={{ color: 'var(--danger)', fontWeight: 700 }}>({p.stock}/{p.minStock})</span>
               </span>
@@ -271,13 +271,19 @@ export default function InventoryPage() {
 
       <div className="card mb-4">
         <div className="card-body" style={{ padding: '14px 20px' }}>
-          <div className="filter-bar" style={{ marginBottom: 0 }}>
-            <div className="search-box" style={{ flex: 1, maxWidth: 320 }}>
-              <i className="fa fa-search icon" />
-              <input placeholder="ابحث بالاسم أو الكود..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
+          {/* Search box */}
+          <div className="search-box" style={{ marginBottom: 12 }}>
+            <i className="fa fa-search icon" />
+            <input placeholder="ابحث بالاسم أو الكود..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          {/* Category buttons — horizontal scroll */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4, WebkitOverflowScrolling: 'touch' as any }}>
             {['الكل', ...categories].map(c => (
-              <button key={c} onClick={() => setCategory(c)} className={`btn btn-sm ${category === c ? 'btn-primary' : 'btn-outline'}`}>{c}</button>
+              <button key={c} onClick={() => setCategory(c)}
+                className={`btn btn-sm ${category === c ? 'btn-primary' : 'btn-outline'}`}
+                style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {c}
+              </button>
             ))}
           </div>
         </div>

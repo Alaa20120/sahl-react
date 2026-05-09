@@ -9,6 +9,7 @@ import { useTreasuryStore } from '@/store/treasury.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { printDelegateWithdrawalReceipt, printStockReceipt, printAccountStatement, printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
+import { exportExcel } from '@/lib/excel'
 
 type Tab = 'overview' | 'warehouse' | 'invoices' | 'finance' | 'location'
 
@@ -288,9 +289,40 @@ export default function DelegateDetailPage() {
       {/* ── Warehouse Tab ── */}
       {tab === 'warehouse' && (
         <div className="card">
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14, display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span><i className="fa fa-warehouse" style={{ marginLeft: 8, color: 'var(--blue)' }} /> مستودع المندوب</span>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>إجمالي القيمة: <strong style={{ color: 'var(--text)' }}>{fmt(whTotal)}</strong></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>إجمالي القيمة: <strong style={{ color: 'var(--text)' }}>{fmt(whTotal)}</strong></span>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                exportExcel({
+                  title: `مستودع المندوب — ${d.name}`,
+                  filename: `مستودع-${d.name}-${new Date().toISOString().slice(0,10)}`,
+                  columns: [
+                    { header: 'الصنف', key: 'productName', width: 28, type: 'text' },
+                    { header: 'الكود', key: 'productSku', width: 20, type: 'text', align: 'center' },
+                    { header: 'الكمية', key: 'qty', width: 12, type: 'number', align: 'center' },
+                    { header: 'سعر التكلفة', key: 'costPrice', width: 16, type: 'currency' },
+                    { header: 'إجمالي القيمة', key: 'total', width: 18, type: 'currency' },
+                    { header: 'تاريخ الاستلام', key: 'receivedDate', width: 16, type: 'date', align: 'center' },
+                    { header: 'المصدر', key: 'source', width: 14, type: 'text', align: 'center' },
+                  ],
+                  rows: d.warehouse.map(w => ({
+                    productName: w.productName, productSku: w.productSku || '',
+                    qty: w.qty, costPrice: w.costPrice, total: w.qty * w.costPrice,
+                    receivedDate: w.receivedDate,
+                    source: w.source === 'company' ? 'عهدة شركة' : 'مشتريات',
+                  })),
+                  totals: {
+                    productName: `${d.warehouse.length} صنف`, productSku: '',
+                    qty: d.warehouse.reduce((s,w) => s + w.qty, 0), costPrice: 0,
+                    total: whTotal, receivedDate: '', source: '',
+                  },
+                })
+                toast('تم تصدير المستودع', 'success')
+              }}>
+                <i className="fa fa-file-excel" /> Excel
+              </button>
+            </div>
           </div>
           {d.warehouse.length === 0 ? (
             <div className="empty-state">

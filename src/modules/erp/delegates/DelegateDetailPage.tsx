@@ -390,28 +390,45 @@ export default function DelegateDetailPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>إجمالي القيمة: <strong style={{ color: 'var(--text)' }}>{fmt(whTotal)}</strong></span>
               <button className="btn btn-outline btn-sm" onClick={() => {
+                // Export aggregated view (received/sold/available)
+                const soldQty: Record<string, number> = {}
+                d.invoices.filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
+                  .forEach(inv => inv.items.forEach((it: any) => {
+                    if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
+                  }))
+                const grouped: Record<string, any> = {}
+                d.warehouse.forEach(w => {
+                  const key = w.productId || w.productName
+                  if (!grouped[key]) grouped[key] = { name: w.productName, cost: w.costPrice, received: 0 }
+                  grouped[key].received += w.qty
+                })
+                const exportRows = Object.entries(grouped).map(([key, r]: any) => ({
+                  productName: r.name,
+                  received: r.received,
+                  sold: soldQty[key] || 0,
+                  available: Math.max(0, r.received - (soldQty[key] || 0)),
+                  costPrice: r.cost,
+                  totalValue: Math.max(0, r.received - (soldQty[key] || 0)) * r.cost,
+                }))
                 exportExcel({
                   title: `مستودع المندوب — ${d.name}`,
                   filename: `مستودع-${d.name}-${new Date().toISOString().slice(0,10)}`,
                   columns: [
                     { header: 'الصنف', key: 'productName', width: 28, type: 'text' },
-                    { header: 'الكود', key: 'productSku', width: 20, type: 'text', align: 'center' },
-                    { header: 'الكمية', key: 'qty', width: 12, type: 'number', align: 'center' },
+                    { header: 'المستلم', key: 'received', width: 12, type: 'number', align: 'center' },
+                    { header: 'المباع', key: 'sold', width: 12, type: 'number', align: 'center' },
+                    { header: 'المتوفر', key: 'available', width: 12, type: 'number', align: 'center' },
                     { header: 'سعر التكلفة', key: 'costPrice', width: 16, type: 'currency' },
-                    { header: 'إجمالي القيمة', key: 'total', width: 18, type: 'currency' },
-                    { header: 'تاريخ الاستلام', key: 'receivedDate', width: 16, type: 'date', align: 'center' },
-                    { header: 'المصدر', key: 'source', width: 14, type: 'text', align: 'center' },
+                    { header: 'قيمة المتوفر', key: 'totalValue', width: 18, type: 'currency' },
                   ],
-                  rows: d.warehouse.map(w => ({
-                    productName: w.productName, productSku: w.productSku || '',
-                    qty: w.qty, costPrice: w.costPrice, total: w.qty * w.costPrice,
-                    receivedDate: w.receivedDate,
-                    source: w.source === 'company' ? 'عهدة شركة' : 'مشتريات',
-                  })),
+                  rows: exportRows,
                   totals: {
-                    productName: `${d.warehouse.length} صنف`, productSku: '',
-                    qty: d.warehouse.reduce((s,w) => s + w.qty, 0), costPrice: 0,
-                    total: whTotal, receivedDate: '', source: '',
+                    productName: `${exportRows.length} صنف`,
+                    received: exportRows.reduce((s,r) => s+r.received, 0),
+                    sold: exportRows.reduce((s,r) => s+r.sold, 0),
+                    available: exportRows.reduce((s,r) => s+r.available, 0),
+                    costPrice: 0,
+                    totalValue: exportRows.reduce((s,r) => s+r.totalValue, 0),
                   },
                 })
                 toast('تم تصدير المستودع', 'success')

@@ -9,6 +9,7 @@ import { useDelegateStore } from '@/store/delegate.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { exportExcel } from '@/lib/excel'
 import { toast } from '@/lib/toast'
+import { useAppStore } from '@/store/app.store'
 
 // Unified invoice shape for display
 interface UnifiedInvoice {
@@ -38,6 +39,7 @@ export default function InvoicesPage() {
   const { invoices: adminInvoices } = useInvoiceStore()
   const delegates = useDelegateStore(s => s.delegates)
   const customers = useCustomerStore(s => s.customers)
+  const co = useAppStore(s => s.company)
   const [searchParams] = useSearchParams()
   const customerFilter = searchParams.get('customer')
 
@@ -124,36 +126,121 @@ export default function InvoicesPage() {
   function handlePrintSelected() {
     const sel = filtered.filter(i => selected.includes(i.id))
     if (!sel.length) return
-    const win = window.open('', '_blank', 'width=900,height=700')
+    const win = window.open('', '_blank', 'width=960,height=800')
     if (!win) { toast('يرجى السماح بالنوافذ المنبثقة', 'warn'); return }
+
+    // Get items for each invoice
+    const getItems = (inv: typeof sel[0]) => {
+      if (inv.source === 'admin') {
+        const orig = adminInvoices.find(a => a.id === inv.id)
+        return orig?.items || []
+      } else {
+        const [delId, invId] = inv.id.split('::')
+        const del = delegates.find(d => d.id === delId)
+        return del?.invoices.find(i => i.id === invId)?.items || []
+      }
+    }
+
+    const f = (n: number) => n.toLocaleString('ar-SA', { minimumFractionDigits: 2 })
+
     win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar">
-    <head><meta charset="UTF-8"><title>طباعة الفواتير</title>
-    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Tajawal',Arial,sans-serif;font-size:13px;color:#111}
-    .page{max-width:780px;margin:0 auto;padding:32px;page-break-after:always}
-    .hdr{background:#0D1117;color:#fff;padding:20px 28px;display:flex;justify-content:space-between;border-radius:8px 8px 0 0}
-    .body{border:1px solid #E5E7EB;border-top:none;padding:20px 28px;border-radius:0 0 8px 8px}
-    .tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px}
-    .grand{border-top:2px solid #0D1117;padding-top:8px;font-size:14px;font-weight:800}
-    @media print{@page{margin:8mm}body{-webkit-print-color-adjust:exact}}</style></head><body>
-    ${sel.map(inv => `
+    <head><meta charset="UTF-8"><title>فاتورة ضريبية</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Tajawal',Arial,sans-serif;font-size:13px;color:#111;background:#f4f6fa}
+    .page{max-width:800px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.1);page-break-after:always}
+    .hdr{background:#0D1117;color:#fff;padding:24px 32px;display:flex;justify-content:space-between;align-items:flex-start}
+    .hdr-co{font-size:18px;font-weight:800;margin-bottom:4px}
+    .hdr-sub{font-size:11px;opacity:.65;line-height:1.8}
+    .hdr-right{text-align:left}
+    .inv-title{font-size:22px;font-weight:900}
+    .inv-meta{font-size:11px;opacity:.7;margin-top:6px;line-height:1.8}
+    .body{padding:24px 32px}
+    .party-box{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+    .party-card{background:#f8fafc;border-radius:8px;padding:14px 16px}
+    .party-label{font-size:10px;font-weight:700;color:#2563EB;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+    .party-name{font-size:15px;font-weight:800}
+    .party-info{font-size:11px;color:#6B7280;margin-top:4px;line-height:1.7}
+    table{width:100%;border-collapse:collapse;margin:16px 0}
+    th{background:#f4f6fa;padding:10px 14px;font-size:11px;font-weight:800;text-align:right;border-bottom:2px solid #E5E7EB;color:#374151}
+    td{padding:10px 14px;border-bottom:1px solid #F3F4F6;font-size:13px}
+    .totals{width:280px;margin-right:auto;margin-top:8px}
+    .tot-row{display:flex;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid #F3F4F6}
+    .tot-grand{border-bottom:none;border-top:2px solid #0D1117;padding-top:10px;font-size:16px;font-weight:900}
+    .badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700}
+    .paid{background:#ECFDF5;color:#065F46}.pending{background:#FFFBEB;color:#92400E}.overdue{background:#FEF2F2;color:#991B1B}
+    .footer{margin-top:20px;padding-top:12px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;font-size:10px;color:#9CA3AF}
+    @media print{@page{margin:8mm;size:A4}body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{margin:0;box-shadow:none;border-radius:0}}
+    </style></head><body>
+    ${sel.map(inv => {
+      const items = getItems(inv)
+      const creator = inv.source === 'delegate' ? `المندوب: ${inv.delegateName}` : 'الإدارة'
+      const statusClass = inv.status === 'paid' ? 'paid' : inv.status === 'overdue' ? 'overdue' : 'pending'
+      const statusLabel = inv.status === 'paid' ? 'مدفوعة' : inv.status === 'overdue' ? 'متأخرة' : inv.status === 'partial' ? 'جزئية' : inv.status === 'confirmed' ? 'مؤكدة' : 'معلقة'
+      return `
       <div class="page">
         <div class="hdr">
-          <div><div style="font-size:16px;font-weight:800">شركة سهل التقنية</div>
-          <div style="font-size:11px;opacity:.7">الرقم الضريبي: 310123456700003</div>
-          ${inv.source === 'delegate' ? `<div style="font-size:11px;opacity:.6">المندوب: ${inv.delegateName}</div>` : ''}</div>
-          <div style="text-align:left"><div style="font-size:18px;font-weight:800">فاتورة ضريبية</div>
-          <div style="font-size:11px;opacity:.7">${inv.number} | ${inv.date}</div></div>
-        </div>
-        <div class="body">
-          <div style="margin-bottom:16px"><div style="font-weight:700">${inv.customer}</div></div>
-          <div style="width:240px;margin-right:auto">
-            <div class="tot-row"><span style="color:#6B7280">قبل الضريبة</span><span>${inv.amount.toLocaleString('ar-SA')}</span></div>
-            <div class="tot-row"><span style="color:#F59E0B">ضريبة 15%</span><span>${inv.tax.toLocaleString('ar-SA')}</span></div>
-            <div class="tot-row grand"><span>الإجمالي</span><span>${inv.total.toLocaleString('ar-SA')}</span></div>
+          <div>
+            <div class="hdr-co">${co.name || 'اسم الشركة'}</div>
+            ${co.nameEn ? `<div style="font-size:11px;opacity:.6">${co.nameEn}</div>` : ''}
+            <div class="hdr-sub">
+              ${co.vat ? `الرقم الضريبي: ${co.vat}<br>` : ''}
+              ${co.phone ? `ج: ${co.phone}<br>` : ''}
+              ${co.address ? `${co.address}، ${co.city}` : ''}
+            </div>
+          </div>
+          <div class="hdr-right">
+            <div class="inv-title">فاتورة ضريبية</div>
+            <div class="inv-meta">
+              رقم الفاتورة: ${inv.number}<br>
+              التاريخ: ${inv.date}<br>
+              المُصدِر: ${creator}<br>
+              <span class="badge ${statusClass}">${statusLabel}</span>
+            </div>
           </div>
         </div>
-      </div>`).join('')}
-    <script>window.onload=()=>{window.print();window.close()}<\/script></body></html>`)
+        <div class="body">
+          <div class="party-box">
+            <div class="party-card">
+              <div class="party-label">فاتورة إلى</div>
+              <div class="party-name">${inv.customer}</div>
+            </div>
+            <div class="party-card">
+              <div class="party-label">بيانات الدفع</div>
+              <div style="font-size:12px;font-weight:700">${inv.paymentMethod === 'cash' ? '💵 نقدي — مدفوع فوراً' : '📋 آجل — مؤجل الدفع'}</div>
+              <div style="font-size:11px;color:#6B7280;margin-top:4px">المدفوع: ${f(inv.paidAmount)} | المتبقي: ${f(Math.max(0, inv.total - inv.paidAmount))}</div>
+            </div>
+          </div>
+          ${items.length > 0 ? `
+          <table>
+            <thead><tr><th>#</th><th>الصنف / الوصف</th><th style="text-align:center">الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+            <tbody>
+              ${items.map((it: any, idx: number) => `
+                <tr>
+                  <td style="color:#9CA3AF;font-size:11px">${idx+1}</td>
+                  <td style="font-weight:600">${it.description || it.desc || '—'}</td>
+                  <td style="text-align:center;font-weight:700">${it.qty}</td>
+                  <td>${f(it.price)}</td>
+                  <td style="font-weight:700">${f(it.total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ` : `<div style="text-align:center;padding:20px;color:#9CA3AF;font-size:12px">لا تتوفر بيانات الأصناف</div>`}
+          <div class="totals">
+            <div class="tot-row"><span style="color:#6B7280">قبل الضريبة</span><span style="font-weight:600">${f(inv.amount)}</span></div>
+            <div class="tot-row"><span style="color:#F59E0B">ضريبة 15%</span><span style="color:#F59E0B;font-weight:600">${f(inv.tax)}</span></div>
+            <div class="tot-row tot-grand"><span>الإجمالي</span><span style="color:#0D1117">${f(inv.total)}</span></div>
+          </div>
+          <div class="footer">
+            <span>تم الإصدار بواسطة نظام سهل ERP</span>
+            <span>${new Date().toLocaleDateString('ar-SA')}</span>
+          </div>
+        </div>
+      </div>`
+    }).join('')}
+    <script>window.onload=()=>{window.print()}<\/script></body></html>`)
     win.document.close()
     toast(`جارٍ طباعة ${sel.length} فاتورة...`, 'success')
     setSelected([])

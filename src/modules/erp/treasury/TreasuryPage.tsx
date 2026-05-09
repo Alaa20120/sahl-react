@@ -11,6 +11,7 @@ import { usePurchaseStore } from '@/store/purchase.store'
 import { exportExcel } from '@/lib/excel'
 import { printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
+import { useSaving } from '@/lib/useSaving'
 
 const TYPE_COLORS: Record<TxType, string> = { in: 'var(--success)', out: 'var(--danger)' }
 const CAT_ICONS: Record<TxCategory, string> = {
@@ -24,6 +25,7 @@ const CAT_ICONS: Record<TxCategory, string> = {
 }
 
 export default function TreasuryPage() {
+  const { saving, run } = useSaving()
   const transactions = useTreasuryStore(s => s.transactions)
   const accounts = useTreasuryStore(s => s.accounts)
   const addTransaction = useTreasuryStore(s => s.addTransaction)
@@ -54,28 +56,30 @@ export default function TreasuryPage() {
   const handleSave = () => {
     if (!amount || !desc) { toast('يرجى ملء جميع الحقول', 'warn'); return }
 
-    const amt = parseFloat(amount)
-    const ref = `TX-${Date.now()}`
-    addTransaction({
-      date: new Date().toISOString().slice(0, 10),
-      description: desc,
-      type: txType,
-      category: txCategory,
-      amount: amt,
-      account: selectedAccount,
-      ref,
-    })
+    run(async () => {
+      const amt = parseFloat(amount)
+      const ref = `TX-${Date.now()}`
+      await addTransaction({
+        date: new Date().toISOString().slice(0, 10),
+        description: desc,
+        type: txType,
+        category: txCategory,
+        amount: amt,
+        account: selectedAccount,
+        ref,
+      })
 
-    // Print receipt automatically
-    const accountName = accounts.find(a => a.id === selectedAccount)?.label ?? selectedAccount
-    const categoryLabel = txCategory === 'invoice' ? 'فواتير' : txCategory === 'expense' ? 'مصروفات' : txCategory === 'salary' ? 'رواتب' : txCategory === 'purchase' ? 'مشتريات' : txCategory === 'transfer' ? 'تحويل' : 'أخرى'
-    printFinancialReceipt(txType, amt, desc, accountName, categoryLabel, ref)
+      // Print receipt automatically
+      const accountName = accounts.find(a => a.id === selectedAccount)?.label ?? selectedAccount
+      const categoryLabel = txCategory === 'invoice' ? 'فواتير' : txCategory === 'expense' ? 'مصروفات' : txCategory === 'salary' ? 'رواتب' : txCategory === 'purchase' ? 'مشتريات' : txCategory === 'transfer' ? 'تحويل' : 'أخرى'
+      printFinancialReceipt(txType, amt, desc, accountName, categoryLabel, ref)
 
-    toast(`تم تسجيل ${txType === 'in' ? 'إيراد' : 'مصروف'} بقيمة ${fmt(amt)}`, 'success')
-    setShowNew(false)
-    setAmount('')
-    setDesc('')
-    setTxCategory('other')
+      toast(`تم تسجيل ${txType === 'in' ? 'إيراد' : 'مصروف'} بقيمة ${fmt(amt)}`, 'success')
+      setShowNew(false)
+      setAmount('')
+      setDesc('')
+      setTxCategory('other')
+    }).catch((err: any) => toast(`خطأ في تسجيل الحركة: ${err?.message || 'حاول مرة أخرى'}`, 'danger'))
   }
 
   return (
@@ -251,7 +255,7 @@ export default function TreasuryPage() {
             </select>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave}>حفظ</button>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>حفظ</button>
             <button className="btn btn-outline" onClick={() => setShowNew(false)}>إلغاء</button>
           </div>
         </div>

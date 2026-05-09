@@ -4,19 +4,31 @@ import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import { fmt, fmtNum } from '@/lib/format'
-import { CATEGORIES, hasPendingWithdrawals } from '@/lib/mock-data/inventory'
+import { hasPendingWithdrawals } from '@/lib/mock-data/inventory'
 import { useInventoryStore } from '@/store/inventory.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useInvoiceStore } from '@/store/invoice.store'
+import { useCategoryStore } from '@/store/category.store'
 import { exportExcel } from '@/lib/excel'
 import { toast } from '@/lib/toast'
+import { useSaving } from '@/lib/useSaving'
+
+const BLANK_PRODUCT = { name: '', category: '', unit: 'قطعة', costPrice: '', sellPrice: '', stock: '0', minStock: '10' }
 
 export default function InventoryPage() {
   const navigate = useNavigate()
-  const { products, deleteProducts } = useInventoryStore()
+  const { products, deleteProducts, addProduct } = useInventoryStore()
   const { delegates } = useDelegateStore()
   const { invoices } = useInvoiceStore()
+  const { categories, addCategory } = useCategoryStore()
+  const { saving, run } = useSaving()
+  const saveCat = useSaving()
   const [showProfitability, setShowProfitability] = useState(false)
+  const [newForm, setNewForm] = useState(BLANK_PRODUCT)
+  const [saveError, setSaveError] = useState('')
+  const [showNewCat, setShowNewCat] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [catError, setCatError] = useState('')
 
   // Product profitability: for each product, find all invoice items matching it,
   // then calculate (sold qty × sell price) - (sold qty × cost price) = gross profit
@@ -55,6 +67,9 @@ export default function InventoryPage() {
   const [showNew, setShowNew] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [adjustProduct, setAdjustProduct] = useState<{id: string; name: string; stock: number} | null>(null)
+  const [adjustQty, setAdjustQty] = useState('')
+  const adjustSaving = useSaving()
 
   const filtered = products.filter(p => {
     const matchCat = category === 'الكل' || p.category === category
@@ -97,10 +112,12 @@ export default function InventoryPage() {
 
   function handleDeleteConfirmed() {
     const count = selectedIds.size
-    deleteProducts(Array.from(selectedIds))
-    setSelectedIds(new Set())
-    setShowDeleteConfirm(false)
-    toast(`تم حذف ${count} ${count === 1 ? 'منتج' : 'منتجات'} بنجاح`, 'success')
+    run(async () => {
+      await deleteProducts(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setShowDeleteConfirm(false)
+      toast(`تم حذف ${count} ${count === 1 ? 'منتج' : 'منتجات'} بنجاح`, 'success')
+    }).catch((err: any) => toast(`خطأ في الحذف: ${err?.message || 'حاول مرة أخرى'}`, 'danger'))
   }
 
   return (
@@ -140,6 +157,9 @@ export default function InventoryPage() {
               toast('تم تصدير المخزون بنجاح', 'success')
             }}>
               <i className="fa fa-file-excel" /> تصدير Excel
+            </button>
+            <button className="btn btn-outline btn-sm" onClick={() => { setShowNewCat(true); setNewCatName(''); setCatError('') }}>
+              <i className="fa fa-tag" /> فئة جديدة
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
               <i className="fa fa-plus" /> صنف جديد
@@ -256,7 +276,7 @@ export default function InventoryPage() {
               <i className="fa fa-search icon" />
               <input placeholder="ابحث بالاسم أو الكود..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            {CATEGORIES.map(c => (
+            {['الكل', ...categories].map(c => (
               <button key={c} onClick={() => setCategory(c)} className={`btn btn-sm ${category === c ? 'btn-primary' : 'btn-outline'}`}>{c}</button>
             ))}
           </div>
@@ -374,10 +394,11 @@ export default function InventoryPage() {
                         </button>
                         <button
                           className="btn btn-icon btn-outline btn-sm"
-                          onClick={() => toast('جارٍ استخراج الباركود...', 'info')}
-                          title="QR Code"
+                          onClick={() => { setAdjustProduct({ id: p.id, name: p.name, stock: p.stock }); setAdjustQty(String(p.stock)) }}
+                          title="تصحيح الكمية"
+                          style={{ color: 'var(--warn)' }}
                         >
-                          <i className="fa fa-qrcode" />
+                          <i className="fa fa-sliders" />
                         </button>
                       </div>
                     </td>
@@ -420,24 +441,173 @@ export default function InventoryPage() {
       {/* Add New Product Modal */}
       <Modal
         open={showNew}
-        onClose={() => setShowNew(false)}
+        onClose={() => { setShowNew(false); setNewForm(BLANK_PRODUCT); setSaveError('') }}
         title="إضافة صنف جديد"
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => setShowNew(false)}>إلغاء</button>
-            <button className="btn btn-primary" onClick={() => { toast('تم إضافة الصنف', 'success'); setShowNew(false) }}>حفظ</button>
+            <button className="btn btn-outline" onClick={() => { setShowNew(false); setNewForm(BLANK_PRODUCT); setSaveError('') }}>إلغاء</button>
+            <button className="btn btn-primary" disabled={saving} onClick={() => {
+              if (!newForm.name.trim()) { setSaveError('أدخل اسم الصنف'); return }
+              if (!newForm.costPrice || !newForm.sellPrice) { setSaveError('أدخل أسعار الشراء والبيع'); return }
+              setSaveError('')
+              run(async () => {
+                const sku = `SKU-${Date.now()}`
+                await addProduct({
+                  id: crypto.randomUUID(),
+                  sku,
+                  name: newForm.name.trim(),
+                  category: newForm.category || categories[0] || 'عام',
+                  unit: newForm.unit,
+                  costPrice: parseFloat(newForm.costPrice) || 0,
+                  sellPrice: parseFloat(newForm.sellPrice) || 0,
+                  stock: parseInt(newForm.stock) || 0,
+                  minStock: parseInt(newForm.minStock) || 0,
+                  status: 'active',
+                })
+                toast(`تم إضافة "${newForm.name}" بنجاح`, 'success')
+                setShowNew(false)
+                setNewForm(BLANK_PRODUCT)
+              }).catch((err: any) => setSaveError(err?.message || 'فشل الحفظ'))
+            }}>
+              {saving ? <><i className="fa fa-spinner fa-spin" /> جارٍ الحفظ...</> : <><i className="fa fa-save" /> حفظ</>}
+            </button>
           </>
         }
       >
         <div className="form-grid-2">
-          <div className="form-group col-span-2"><label className="form-label">اسم الصنف</label><input className="form-control" placeholder="اسم الصنف أو المنتج" /></div>
-          <div className="form-group"><label className="form-label">الفئة</label><select className="form-control">{CATEGORIES.filter(c => c !== 'الكل').map(c => <option key={c}>{c}</option>)}</select></div>
-          <div className="form-group"><label className="form-label">الوحدة</label><select className="form-control"><option>قطعة</option><option>كيلو</option><option>لتر</option><option>كرتون</option></select></div>
-          <div className="form-group"><label className="form-label">سعر الشراء</label><input className="form-control" type="number" placeholder="0.00" /></div>
-          <div className="form-group"><label className="form-label">سعر البيع</label><input className="form-control" type="number" placeholder="0.00" /></div>
-          <div className="form-group"><label className="form-label">الكمية المبدئية</label><input className="form-control" type="number" placeholder="0" /></div>
-          <div className="form-group"><label className="form-label">الحد الأدنى</label><input className="form-control" type="number" placeholder="10" /></div>
+          <div className="form-group col-span-2">
+            <label className="form-label">اسم الصنف *</label>
+            <input className="form-control" placeholder="اسم الصنف أو المنتج" value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">الفئة</label>
+            <select className="form-control" value={newForm.category} onChange={e => setNewForm(f => ({ ...f, category: e.target.value }))}>
+              {categories.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">الوحدة</label>
+            <select className="form-control" value={newForm.unit} onChange={e => setNewForm(f => ({ ...f, unit: e.target.value }))}>
+              {['قطعة','كيلو','لتر','كرتون','متر','طن'].map(u => <option key={u}>{u}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">سعر الشراء *</label>
+            <input className="form-control" type="number" placeholder="0.00" value={newForm.costPrice} onChange={e => setNewForm(f => ({ ...f, costPrice: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">سعر البيع *</label>
+            <input className="form-control" type="number" placeholder="0.00" value={newForm.sellPrice} onChange={e => setNewForm(f => ({ ...f, sellPrice: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">الكمية المبدئية</label>
+            <input className="form-control" type="number" placeholder="0" value={newForm.stock} onChange={e => setNewForm(f => ({ ...f, stock: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">الحد الأدنى</label>
+            <input className="form-control" type="number" placeholder="10" value={newForm.minStock} onChange={e => setNewForm(f => ({ ...f, minStock: e.target.value }))} />
+          </div>
         </div>
+        {saveError && (
+          <div style={{ marginTop: 12, background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--danger)' }}>
+            <i className="fa fa-exclamation-circle" style={{ marginLeft: 6 }} />{saveError}
+          </div>
+        )}
+      </Modal>
+      {/* Stock Adjustment Modal */}
+      <Modal
+        open={!!adjustProduct}
+        onClose={() => setAdjustProduct(null)}
+        title={`تصحيح كمية: ${adjustProduct?.name}`}
+        width={380}
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setAdjustProduct(null)}>إلغاء</button>
+            <button className="btn btn-primary" disabled={adjustSaving.saving} onClick={() => {
+              const newStock = parseInt(adjustQty)
+              if (isNaN(newStock) || newStock < 0) { toast('أدخل كمية صحيحة', 'warn'); return }
+              adjustSaving.run(async () => {
+                const { updateProduct } = useInventoryStore.getState()
+                await updateProduct(adjustProduct!.id, { stock: newStock })
+                toast(`تم تصحيح كمية "${adjustProduct!.name}" إلى ${newStock}`, 'success')
+                setAdjustProduct(null)
+              }).catch((e: any) => toast(`خطأ: ${e?.message}`, 'danger'))
+            }}>
+              {adjustSaving.saving ? <><i className="fa fa-spinner fa-spin" /> جارٍ الحفظ...</> : <><i className="fa fa-check" /> تصحيح</>}
+            </button>
+          </>
+        }
+      >
+        <div style={{ marginBottom: 12, background: 'var(--warn-bg)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--warn)' }}>
+          <i className="fa fa-triangle-exclamation" style={{ marginLeft: 6 }} />
+          الكمية الحالية: <strong>{adjustProduct?.stock}</strong> — أدخل الكمية الصحيحة
+        </div>
+        <div className="form-group">
+          <label className="form-label">الكمية الصحيحة</label>
+          <input
+            className="form-control"
+            type="number"
+            min="0"
+            value={adjustQty}
+            onChange={e => setAdjustQty(e.target.value)}
+            autoFocus
+          />
+        </div>
+      </Modal>
+
+      {/* Add New Category Modal */}
+      <Modal
+        open={showNewCat}
+        onClose={() => setShowNewCat(false)}
+        title="إضافة فئة جديدة"
+        width={400}
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setShowNewCat(false)}>إلغاء</button>
+            <button className="btn btn-primary" disabled={saveCat.saving} onClick={() => {
+              if (!newCatName.trim()) { setCatError('أدخل اسم الفئة'); return }
+              if (categories.includes(newCatName.trim())) { setCatError('هذه الفئة موجودة مسبقاً'); return }
+              setCatError('')
+              saveCat.run(async () => {
+                await addCategory(newCatName.trim())
+                toast(`تم إضافة فئة "${newCatName.trim()}"`, 'success')
+                setShowNewCat(false)
+                setNewCatName('')
+              }).catch((err: any) => setCatError(err?.message || 'فشل الحفظ'))
+            }}>
+              {saveCat.saving ? <><i className="fa fa-spinner fa-spin" /> جارٍ الحفظ...</> : <><i className="fa fa-tag" /> إضافة الفئة</>}
+            </button>
+          </>
+        }
+      >
+        <div className="form-group">
+          <label className="form-label">اسم الفئة *</label>
+          <input
+            className="form-control"
+            placeholder="مثال: إلكترونيات، أغذية، مواد خام..."
+            value={newCatName}
+            onChange={e => setNewCatName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && document.querySelector<HTMLButtonElement>('[data-save-cat]')?.click()}
+            autoFocus
+          />
+        </div>
+        {catError && (
+          <div style={{ marginTop: 10, background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--danger)' }}>
+            <i className="fa fa-exclamation-circle" style={{ marginLeft: 6 }} />{catError}
+          </div>
+        )}
+        {categories.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, fontWeight: 600 }}>الفئات الحالية:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {categories.map(c => (
+                <span key={c} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 20, padding: '3px 12px', fontSize: 12, color: 'var(--text-2)' }}>
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )

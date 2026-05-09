@@ -6,6 +6,7 @@ import { fmt, fmtDate } from '@/lib/format'
 import { type Invoice, type InvoiceStatus } from '@/lib/mock-data/invoices'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { useInventoryStore } from '@/store/inventory.store'
+import { useAppStore } from '@/store/app.store'
 import { toast } from '@/lib/toast'
 
 type TplId = 'classic' | 'modern' | 'clean' | 'minimal' | 'bold'
@@ -32,6 +33,7 @@ function openPrintWindow(
   status: InvoiceStatus,
   tpl: typeof TEMPLATES[0],
   isVoided: boolean,
+  co?: { name: string; nameEn: string; vat: string; cr: string; phone: string; email: string; address: string; city: string },
 ) {
   const win = window.open('', '_blank', 'width=920,height=760')
   if (!win) { toast('يرجى السماح بالنوافذ المنبثقة', 'warn'); return }
@@ -81,14 +83,15 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
         <div style="width:44px;height:44px;border-radius:10px;background:${isLight ? accent + '18' : 'rgba(255,255,255,.15)'};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:${isLight ? accent : '#fff'};flex-shrink:0">س</div>
         <div>
-          <div class="company-name">شركة سهل التقنية</div>
-          <div class="company-sub">Sahl Technology Co.</div>
+          <div class="company-name">${co?.name || 'اسم الشركة'}</div>
+          <div class="company-sub">${co?.nameEn || ''}</div>
         </div>
       </div>
       <div class="company-info">
-        <div>الرياض، حي العليا، شارع التحلية</div>
-        <div>ج: 0112345678 | info@sahl.sa</div>
-        <div>الرقم الضريبي: 310123456700003</div>
+        ${co?.address ? `<div>${co.address}، ${co.city}</div>` : ''}
+        ${(co?.phone || co?.email) ? `<div>${co?.phone ? `ج: ${co.phone}` : ''}${co?.phone && co?.email ? ' | ' : ''}${co?.email || ''}</div>` : ''}
+        ${co?.vat ? `<div>الرقم الضريبي: ${co.vat}</div>` : ''}
+        ${co?.cr ? `<div>السجل التجاري: ${co.cr}</div>` : ''}
       </div>
     </div>
     <div>
@@ -203,6 +206,7 @@ export default function InvoiceDetailPage() {
   const navigate = useNavigate()
   const { invoices, addPayment, updateStatus, confirmInvoice } = useInvoiceStore()
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
+  const co = useAppStore(s => s.company)
   const invoice = invoices.find(i => i.id === id)
 
   const [template, setTemplate]         = useState<TplId>(getTemplate)
@@ -228,8 +232,8 @@ export default function InvoiceDetailPage() {
 
   const tpl = TEMPLATES.find(t => t.id === template) ?? TEMPLATES[0]
 
-  const handlePrint = () => openPrintWindow(invoice, status, tpl, isVoided)
-  const handlePDF   = () => { toast('جارٍ تحضير PDF...', 'info'); setTimeout(() => openPrintWindow(invoice, status, tpl, isVoided), 200) }
+  const handlePrint = () => openPrintWindow(invoice, status, tpl, isVoided, co)
+  const handlePDF   = () => { toast('جارٍ تحضير PDF...', 'info'); setTimeout(() => openPrintWindow(invoice, status, tpl, isVoided, co), 200) }
 
   const handlePayment = () => {
     if (!payAmount) { toast('يرجى إدخال المبلغ', 'warn'); return }
@@ -384,14 +388,15 @@ export default function InvoiceDetailPage() {
                   <span style={{ fontSize: 18, fontWeight: 900, color: tpl.headerColor === '#fff' ? '#fff' : tpl.accentColor }}>س</span>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>شركة سهل التقنية</div>
-                  <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>Sahl Technology Co.</div>
+                  <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>{co.name || 'اسم الشركة'}</div>
+                  <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>{co.nameEn}</div>
                 </div>
               </div>
               <div style={{ fontSize: 12, opacity: .75, lineHeight: 1.8 }}>
-                <div>الرياض، حي العليا، شارع التحلية</div>
-                <div>ج: 0112345678 | info@sahl.sa</div>
-                <div>الرقم الضريبي: 310123456700003</div>
+                {co.address && <div>{co.address}، {co.city}</div>}
+                {(co.phone || co.email) && <div>{co.phone && `ج: ${co.phone}`}{co.phone && co.email ? ' | ' : ''}{co.email}</div>}
+                {co.vat && <div>الرقم الضريبي: {co.vat}</div>}
+                {co.cr && <div>السجل التجاري: {co.cr}</div>}
               </div>
             </div>
 
@@ -463,11 +468,12 @@ export default function InvoiceDetailPage() {
               <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flex: 1 }}>
                 <div style={{ flexShrink: 0 }}>
                   <ZATCAQRCode
-                    sellerName="شركة سهل التقنية"
-                    vatNumber="310123456700003"
+                    sellerName={co.name || 'الشركة'}
+                    vatNumber={co.vat || ''}
                     invoiceDate={invoice.date + 'T00:00:00Z'}
                     totalWithVat={invoice.total}
                     vatAmount={invoice.tax}
+                    invoiceNumber={invoice.number}
                     size={90}
                   />
                   <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 5, textAlign: 'center', maxWidth: 90 }}>ZATCA QR</div>

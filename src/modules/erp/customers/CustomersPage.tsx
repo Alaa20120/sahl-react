@@ -12,6 +12,7 @@ import { useTreasuryStore } from '@/store/treasury.store'
 import { printPaymentReceipt, printAccountStatement } from '@/lib/print'
 import { type CustomerType } from '@/lib/mock-data/customers'
 import { toast } from '@/lib/toast'
+import { useSaving } from '@/lib/useSaving'
 
 const TYPE_LABELS = { all: 'الكل', customer: 'عملاء', supplier: 'موردون', both: 'عميل ومورد' }
 const AVATAR_COLORS = ['#2563EB','#7C3AED','#10B981','#D97706','#DC2626','#0891B2']
@@ -24,6 +25,7 @@ export default function CustomersPage() {
   const { invoices } = useInvoiceStore()
   const { delegates } = useDelegateStore()
   const { addTransaction } = useTreasuryStore()
+  const { saving, run } = useSaving()
 
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | CustomerType>('all')
@@ -59,20 +61,18 @@ export default function CustomersPage() {
   function handleAdd() {
     if (!newForm.name.trim()) { toast('أدخل الاسم', 'warn'); return }
     if (!newForm.phone.trim()) { toast('أدخل رقم الهاتف', 'warn'); return }
-    addCustomer({
-      name: newForm.name.trim(),
-      type: newForm.type,
-      phone: newForm.phone.trim(),
-      email: newForm.email.trim(),
-      vatNumber: newForm.vatNumber.trim() || undefined,
-      commercialReg: newForm.commercialReg.trim() || undefined,
-      address: newForm.address.trim(),
-      balance: 0,
-      status: 'active',
-    })
-    toast(`تم إضافة "${newForm.name}" بنجاح`, 'success')
-    setShowNew(false)
-    setNewForm(BLANK_FORM)
+    run(async () => {
+      await addCustomer({
+        name: newForm.name.trim(), type: newForm.type,
+        phone: newForm.phone.trim(), email: newForm.email.trim(),
+        vatNumber: newForm.vatNumber.trim() || undefined,
+        commercialReg: newForm.commercialReg.trim() || undefined,
+        address: newForm.address.trim(), balance: 0, status: 'active',
+      })
+      toast(`تم إضافة "${newForm.name}" بنجاح`, 'success')
+      setShowNew(false)
+      setNewForm(BLANK_FORM)
+    }).catch((err: any) => toast(`خطأ: ${err?.message || 'حاول مرة أخرى'}`, 'danger'))
   }
 
   function openEdit(id: string) {
@@ -85,26 +85,30 @@ export default function CustomersPage() {
   function handleEdit() {
     if (!editId) return
     if (!editForm.name.trim()) { toast('أدخل الاسم', 'warn'); return }
-    updateCustomer(editId, {
-      name: editForm.name.trim(),
-      type: editForm.type,
-      phone: editForm.phone.trim(),
-      email: editForm.email.trim(),
-      vatNumber: editForm.vatNumber.trim() || undefined,
-      commercialReg: editForm.commercialReg.trim() || undefined,
-      address: editForm.address.trim(),
-    })
-    toast('تم تحديث البيانات بنجاح', 'success')
-    setEditId(null)
+    run(async () => {
+      await updateCustomer(editId, {
+        name: editForm.name.trim(),
+        type: editForm.type,
+        phone: editForm.phone.trim(),
+        email: editForm.email.trim(),
+        vatNumber: editForm.vatNumber.trim() || undefined,
+        commercialReg: editForm.commercialReg.trim() || undefined,
+        address: editForm.address.trim(),
+      })
+      toast('تم تحديث البيانات بنجاح', 'success')
+      setEditId(null)
+    }).catch((err: any) => toast(`خطأ في التحديث: ${err?.message || 'حاول مرة أخرى'}`, 'danger'))
   }
 
   function handleDelete(id: string, name: string) {
     if (!window.confirm(`هل تريد حذف "${name}"؟`)) return
-    deleteCustomer(id)
-    toast(`تم حذف "${name}"`, 'success')
+    run(async () => {
+      await deleteCustomer(id)
+      toast(`تم حذف "${name}"`, 'success')
+    }).catch((err: any) => toast(`خطأ في الحذف: ${err?.message || 'حاول مرة أخرى'}`, 'danger'))
   }
 
-  function handlePayment() {
+  async function handlePayment() {
     if (!profileCustomer) return
     const amount = parseFloat(paymentAmount)
     if (!amount || amount <= 0) { toast('أدخل مبلغ صحيح', 'warn'); return }
@@ -116,43 +120,47 @@ export default function CustomersPage() {
     const delta = paymentType === 'in' ? +amount : -amount
     const balanceAfter = balanceBefore + delta
 
-    const payment = addPayment({
-      customerId: profileCustomer.id,
-      date: new Date().toISOString().slice(0, 10),
-      amount,
-      type: paymentType as 'in' | 'out',
-      method: paymentMethod,
-      description: paymentDesc || (paymentType === 'in' ? 'استلام مبلغ' : 'صرف مبلغ'),
-      balanceBefore,
-      balanceAfter,
-    })
+    try {
+      const payment = await addPayment({
+        customerId: profileCustomer.id,
+        date: new Date().toISOString().slice(0, 10),
+        amount,
+        type: paymentType as 'in' | 'out',
+        method: paymentMethod,
+        description: paymentDesc || (paymentType === 'in' ? 'استلام مبلغ' : 'صرف مبلغ'),
+        balanceBefore,
+        balanceAfter,
+      })
 
-    // Add to treasury
-    addTransaction({
-      date: new Date().toISOString().slice(0, 10),
-      description: `${paymentType === 'in' ? 'استلام' : 'صرف'} من/لـ ${profileCustomer.name} — ${paymentDesc}`,
-      type: paymentType as 'in' | 'out',
-      category: 'other',
-      amount,
-      account: 'cash',
-      ref: payment.refId,
-    })
+      // Add to treasury
+      await addTransaction({
+        date: new Date().toISOString().slice(0, 10),
+        description: `${paymentType === 'in' ? 'استلام' : 'صرف'} من/لـ ${profileCustomer.name} — ${paymentDesc}`,
+        type: paymentType as 'in' | 'out',
+        category: 'other',
+        amount,
+        account: 'cash',
+        ref: payment.refId,
+      })
 
-    printPaymentReceipt(
-      profileCustomer.name,
-      amount,
-      (paymentType === 'in' ? 'collection' : 'payment') as 'collection' | 'payment',
-      paymentMethod,
-      balanceBefore,
-      balanceAfter,
-      payment.refId,
-      paymentDesc
-    )
+      printPaymentReceipt(
+        profileCustomer.name,
+        amount,
+        (paymentType === 'in' ? 'collection' : 'payment') as 'collection' | 'payment',
+        paymentMethod,
+        balanceBefore,
+        balanceAfter,
+        payment.refId,
+        paymentDesc
+      )
 
-    toast(`تم ${paymentType === 'in' ? 'استلام' : 'صرف'} ${fmt(amount)} بنجاح`, 'success')
-    setShowPayment(false)
-    setPaymentAmount('')
-    setPaymentDesc('')
+      toast(`تم ${paymentType === 'in' ? 'استلام' : 'صرف'} ${fmt(amount)} بنجاح`, 'success')
+      setShowPayment(false)
+      setPaymentAmount('')
+      setPaymentDesc('')
+    } catch (err: any) {
+      toast(`خطأ في تسجيل الدفعة: ${err?.message || 'حاول مرة أخرى'}`, 'danger')
+    }
   }
 
   function handlePrintStatement() {
@@ -361,7 +369,9 @@ export default function CustomersPage() {
       <Modal open={showNew} onClose={() => setShowNew(false)} title="إضافة عميل / مورد جديد"
         footer={<>
           <button className="btn btn-outline" onClick={() => setShowNew(false)}>إلغاء</button>
-          <button className="btn btn-primary" onClick={handleAdd}><i className="fa fa-save" /> حفظ</button>
+          <button className="btn btn-primary" onClick={handleAdd} disabled={saving}>
+            {saving ? <><i className="fa fa-spinner fa-spin" /> جارٍ الحفظ...</> : <><i className="fa fa-save" /> حفظ</>}
+          </button>
         </>}
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

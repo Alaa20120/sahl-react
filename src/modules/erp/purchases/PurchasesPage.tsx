@@ -12,6 +12,7 @@ import type { PaymentMethod } from '@/lib/mock-data/invoices'
 import { usePurchaseStore } from '@/store/purchase.store'
 import { useInventoryStore } from '@/store/inventory.store'
 import type { Product } from '@/lib/mock-data/inventory'
+import { useSaving } from '@/lib/useSaving'
 
 const STATUS_COLORS: Record<PurchaseStatus, string> = {
   received: 'var(--success)', pending: 'var(--warn)', partial: 'var(--blue)',
@@ -21,7 +22,7 @@ const STATUS_LABELS: Record<PurchaseStatus, string> = {
   received: 'مستلمة', pending: 'معلقة', partial: 'جزئية', cancelled: 'ملغاة', voided: 'مسترجعة',
 }
 
-interface LineItem { id: number; productId?: string; desc: string; qty: number; price: number }
+interface LineItem { id: number; productId?: string; desc: string; qty: string; price: string }
 
 const VAT = 0.15
 
@@ -84,6 +85,7 @@ function POProductPicker({ value, onChange, onSelect }: {
 }
 
 export default function PurchasesPage() {
+  const { saving, run } = useSaving()
   const navigate = useNavigate()
   const { purchases, addPurchase, nextNumber } = usePurchaseStore()
   const allCustomers = useCustomerStore(s => s.customers)
@@ -103,24 +105,24 @@ export default function PurchasesPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [createdBy, setCreatedBy] = useState('')
   const [notes, setNotes] = useState('')
-  const [items, setItems] = useState<LineItem[]>([{ id: 1, desc: '', qty: 1, price: 0 }])
+  const [items, setItems] = useState<LineItem[]>([{ id: 1, desc: '', qty: '1', price: '' }])
 
   const selectedSupplier = SUPPLIERS.find((s: any) => s.id === supplierId)
   const supplierName = showCustom ? customSupplier : (selectedSupplier?.name ?? '')
 
-  const addItem = () => setItems(prev => [...prev, { id: Date.now(), desc: '', qty: 1, price: 0 }])
+  const addItem = () => setItems(prev => [...prev, { id: Date.now(), desc: '', qty: '1', price: '' }])
   const removeItem = (id: number) => setItems(prev => prev.filter(i => i.id !== id))
   const updateItem = (id: number, key: keyof LineItem, val: string | number) =>
     setItems(prev => prev.map(i => i.id === id ? { ...i, [key]: val } : i))
   const selectProduct = (id: number, product: Product) =>
-    setItems(prev => prev.map(i => i.id === id ? { ...i, productId: product.id, desc: product.name, price: product.costPrice } : i))
+    setItems(prev => prev.map(i => i.id === id ? { ...i, productId: product.id, desc: product.name, price: String(product.costPrice) } : i))
 
-  const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0)
+  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty)||0) * (parseFloat(i.price)||0), 0)
   const tax = subtotal * VAT
   const total = subtotal + tax
 
   const resetForm = () => {
-    setItems([{ id: 1, desc: '', qty: 1, price: 0 }])
+    setItems([{ id: 1, desc: '', qty: '1', price: '' }])
     setCustomSupplier(''); setCreatedBy(''); setNotes('')
     setShowCustom(false); setSupplierId(SUPPLIERS[0]?.id ?? '')
     setDueDate(''); setHasDueDate(false); setPaymentMethod('cash')
@@ -128,26 +130,28 @@ export default function PurchasesPage() {
 
   const handleSave = () => {
     if (!supplierName.trim()) { toast('يرجى اختيار أو إدخال اسم المورد', 'warn'); return }
-    const hasEmpty = items.some(i => !i.desc || i.price <= 0)
+    const hasEmpty = items.some(i => !i.desc || !(parseFloat(i.price) > 0))
     if (hasEmpty) { toast('يرجى ملء جميع بنود الأصناف', 'warn'); return }
 
-    addPurchase({
-      date: poDate,
-      dueDate: hasDueDate ? (dueDate || undefined) : undefined,
-      supplier: supplierName,
-      supplierVat: showCustom ? undefined : selectedSupplier?.vatNumber,
-      itemCount: items.length,
-      amount: subtotal,
-      tax,
-      total,
-      paid: paymentMethod === 'cash' ? total : 0,
-      status: paymentMethod === 'cash' ? 'received' : 'pending',
-      lineItems: items.map(i => ({ description: i.desc, productId: i.productId, qty: i.qty, price: i.price, total: i.qty * i.price })),
-      createdBy: createdBy || undefined,
+    run(async () => {
+      await addPurchase({
+        date: poDate,
+        dueDate: hasDueDate ? (dueDate || undefined) : undefined,
+        supplier: supplierName,
+        supplierVat: showCustom ? undefined : selectedSupplier?.vatNumber,
+        itemCount: items.length,
+        amount: subtotal,
+        tax,
+        total,
+        paid: paymentMethod === 'cash' ? total : 0,
+        status: paymentMethod === 'cash' ? 'received' : 'pending',
+        lineItems: items.map(i => { const q = parseFloat(i.qty)||1; const p = parseFloat(i.price)||0; return { description: i.desc, productId: i.productId, qty: q, price: p, total: q*p } }),
+        createdBy: createdBy || undefined,
+      })
+      toast('تم إنشاء أمر الشراء بنجاح', 'success')
+      setShowNew(false)
+      resetForm()
     })
-    toast('تم إنشاء أمر الشراء بنجاح', 'success')
-    setShowNew(false)
-    resetForm()
   }
 
   const filtered = purchases.filter(p => {
@@ -411,11 +415,11 @@ export default function PurchasesPage() {
                   onChange={v => updateItem(item.id, 'desc', v)}
                   onSelect={p => selectProduct(item.id, p)}
                 />
-                <input className="form-control" type="number" value={item.qty}
-                  onChange={e => updateItem(item.id, 'qty', +e.target.value)}
+                <input className="form-control" type="text" inputMode="decimal" value={item.qty}
+                  onChange={e => updateItem(item.id, 'qty', e.target.value.replace(/[^0-9.]/g, ''))}
                   style={{ textAlign: 'center', padding: '6px 8px' }} />
-                <input className="form-control" type="number" value={item.price || ''}
-                  onChange={e => updateItem(item.id, 'price', +e.target.value || 0)}
+                <input className="form-control" type="text" inputMode="decimal" value={item.price}
+                  onChange={e => updateItem(item.id, 'price', e.target.value.replace(/[^0-9.]/g, ''))}
                   placeholder="0.00" style={{ padding: '6px 8px' }} />
                 <button onClick={() => removeItem(item.id)} disabled={items.length === 1}
                   style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: items.length === 1 ? 'default' : 'pointer', color: 'var(--danger)', opacity: items.length === 1 ? .3 : 1 }}>
@@ -453,7 +457,7 @@ export default function PurchasesPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>
               <i className="fa fa-check" /> إنشاء الأمر
             </button>
             <button className="btn btn-outline" onClick={() => { setShowNew(false); resetForm() }}>إلغاء</button>

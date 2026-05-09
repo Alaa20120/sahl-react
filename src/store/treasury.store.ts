@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { TRANSACTIONS, ACCOUNTS, type Transaction, type TxCategory, type TxType } from '@/lib/mock-data/treasury'
 
 interface TreasuryAccount {
@@ -32,14 +32,12 @@ export const useTreasuryStore = create<TreasuryStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const [txRes, accRes] = await Promise.all([
-          supabase.from('treasury_transactions').select('*').order('created_at', { ascending: false }),
-          supabase.from('treasury_accounts').select('*'),
-        ])
-        if (txRes.error || accRes.error) {
-          set({ error: (txRes.error || accRes.error)?.message || 'Unknown error', loading: false })
-        } else {
-          const mappedTx = (txRes.data || []).map((t: any): Transaction => ({
+        try {
+          const [txData, accData] = await Promise.all([
+            supaFetch('treasury_transactions', { select: '*', limit: 500 }),
+            supaFetch('treasury_accounts', { select: '*', limit: 100 }),
+          ])
+          const mappedTx = (txData || []).map((t: any): Transaction => ({
             id: t.id,
             date: t.date,
             description: t.description,
@@ -50,7 +48,7 @@ export const useTreasuryStore = create<TreasuryStore>()(
             ref: t.ref || undefined,
             account: t.account_id,
           }))
-          const mappedAcc = (accRes.data || []).map((a: any): TreasuryAccount => ({
+          const mappedAcc = (accData || []).map((a: any): TreasuryAccount => ({
             id: a.id,
             label: a.label,
             balance: Number(a.balance) || 0,
@@ -58,28 +56,36 @@ export const useTreasuryStore = create<TreasuryStore>()(
             color: a.color || '#2563EB',
           }))
           set({ transactions: mappedTx, accounts: mappedAcc, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
       async addTransaction(data) {
-        set(state => {
-          const accountIndex = state.accounts.findIndex(a => a.id === data.account)
-          if (accountIndex === -1) return state
+        const state = get()
+        const accountIndex = state.accounts.findIndex(a => a.id === data.account)
+        if (accountIndex === -1) return
 
-          const accounts = [...state.accounts]
-          const acc = { ...accounts[accountIndex] }
-          if (data.type === 'in') acc.balance += data.amount
-          else acc.balance -= data.amount
-          accounts[accountIndex] = acc
+        const accounts = [...state.accounts]
+        const acc = { ...accounts[accountIndex] }
+        if (data.type === 'in') acc.balance += data.amount
+        else acc.balance -= data.amount
+        accounts[accountIndex] = acc
 
-          const newTx: Transaction = {
-            id: `TX-${new Date().getFullYear()}-${String(state.transactions.length + 1).padStart(3, '0')}`,
-            ...data,
-            balance: acc.balance,
-          }
+        const newTx: Transaction = {
+          id: `TX-${new Date().getFullYear()}-${String(state.transactions.length + 1).padStart(3, '0')}`,
+          ...data,
+          balance: acc.balance,
+        }
 
-          if (isSupabaseConfigured()) {
-            supabase.from('treasury_transactions').insert({
+        // Update local state immediately
+        set({ transactions: [newTx, ...state.transactions], accounts })
+
+        // Persist to Supabase
+        if (isSupabaseConfigured()) {
+          await supaFetch('treasury_transactions', {
+            method: 'POST',
+            body: {
               date: data.date,
               description: data.description,
               type: data.type,
@@ -88,12 +94,14 @@ export const useTreasuryStore = create<TreasuryStore>()(
               balance: acc.balance,
               account_id: data.account,
               ref: data.ref || null,
-            })
-            supabase.from('treasury_accounts').update({ balance: acc.balance }).eq('id', data.account)
-          }
-
-          return { transactions: [newTx, ...state.transactions], accounts }
-        })
+            },
+          })
+          await supaFetch('treasury_accounts', {
+            method: 'PATCH',
+            filter: 'id=eq.' + data.account,
+            body: { balance: acc.balance },
+          })
+        }
       },
     }),
     { name: 'sahl-treasury-v3' }

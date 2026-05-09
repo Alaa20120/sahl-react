@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { EXPENSES, type Expense, type ExpenseStatus } from '@/lib/mock-data/expenses'
+import { useTreasuryStore } from './treasury.store'
 
 interface ExpenseStore {
   expenses: Expense[]
@@ -30,10 +31,8 @@ export const useExpenseStore = create<ExpenseStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-        } else {
+        try {
+          const data = await supaFetch('expenses', { select: '*', limit: 500 })
           const mapped = (data || []).map((e: any): Expense => ({
             id: e.id,
             date: e.date,
@@ -45,6 +44,8 @@ export const useExpenseStore = create<ExpenseStore>()(
             status: e.status || 'pending',
           }))
           set({ expenses: mapped, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
@@ -53,23 +54,43 @@ export const useExpenseStore = create<ExpenseStore>()(
         const expense: Expense = { ...data, id }
 
         if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('expenses').insert({
-            date: data.date,
-            employee: data.employee || null,
-            category: data.category || null,
-            description: data.description || null,
-            type: data.type || 'expense',
-            amount: data.amount,
-            status: data.status || 'pending',
+          await supaFetch('expenses', {
+            method: 'POST',
+            body: {
+              date: data.date,
+              employee: data.employee || null,
+              category: data.category || null,
+              description: data.description || null,
+              type: data.type || 'expense',
+              amount: data.amount,
+              status: data.status || 'pending',
+            },
           })
-          if (error) throw new Error(error.message)
         }
         set(state => ({ expenses: [expense, ...state.expenses] }))
       },
 
       async updateStatus(id, status) {
-        if (isSupabaseConfigured()) await supabase.from('expenses').update({ status }).eq('id', id)
+        if (isSupabaseConfigured()) {
+          await supaFetch('expenses', { method: 'PATCH', filter: 'id=eq.' + id, body: { status } })
+        }
         set(state => ({ expenses: state.expenses.map(e => e.id === id ? { ...e, status } : e) }))
+
+        // Treasury: create outgoing transaction when expense is approved
+        if (status === 'approved') {
+          const expense = get().expenses.find(e => e.id === id)
+          if (expense) {
+            await useTreasuryStore.getState().addTransaction({
+              date: expense.date,
+              description: `${expense.type === 'advance' ? 'سلفة' : 'مصروف'} - ${expense.category} - ${expense.employee}`,
+              type: 'out',
+              category: 'expense',
+              amount: expense.amount,
+              account: 'cash',
+              ref: id,
+            })
+          }
+        }
       },
 
       setExpenses(expenses) {

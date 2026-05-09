@@ -6,6 +6,7 @@ import { fmt, fmtDate } from '@/lib/format'
 import { FIXED_ASSETS, ASSET_CATEGORIES, type AssetStatus, type AssetOwnership, type FixedAsset } from '@/lib/mock-data/fixed-assets'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { toast } from '@/lib/toast'
+import { useSaving } from '@/lib/useSaving'
 
 const STATUS_COLORS: Record<AssetStatus, string> = {
   active:      'var(--success)',
@@ -41,6 +42,7 @@ function buildDepSchedule(asset: FixedAsset) {
 }
 
 export default function FixedAssetsPage() {
+  const { saving, run } = useSaving()
   const addTransaction = useTreasuryStore(s => s.addTransaction)
   const accounts = useTreasuryStore(s => s.accounts)
 
@@ -82,31 +84,33 @@ export default function FixedAssetsPage() {
     if (!form.purchaseDate)       { toast('يرجى تحديد تاريخ الشراء', 'warn'); return }
     if (!form.cost || +form.cost <= 0) { toast('يرجى إدخال تكلفة صحيحة', 'warn'); return }
 
-    const cost = +form.cost
-    const depRate = +form.depRate
-    const newId = `FA-${String(assets.length + 1).padStart(3, '0')}`
-    const yearsSince = (new Date().getFullYear() - new Date(form.purchaseDate).getFullYear())
-    const accumulated = Math.min((cost * depRate / 100) * Math.max(yearsSince, 0), cost)
-    const bookValue = Math.max(cost - accumulated, 0)
+    run(async () => {
+      const cost = +form.cost
+      const depRate = +form.depRate
+      const newId = `FA-${String(assets.length + 1).padStart(3, '0')}`
+      const yearsSince = (new Date().getFullYear() - new Date(form.purchaseDate).getFullYear())
+      const accumulated = Math.min((cost * depRate / 100) * Math.max(yearsSince, 0), cost)
+      const bookValue = Math.max(cost - accumulated, 0)
 
-    const newAsset: FixedAsset = {
-      id: newId,
-      name: form.name.trim(),
-      category: form.category,
-      ownership: form.ownership,
-      purchaseDate: form.purchaseDate,
-      cost,
-      accumulated,
-      bookValue,
-      depRate,
-      status: form.status,
-      location: form.location || 'الرئيسي',
-      monthlyRent: form.ownership === 'rental' && form.monthlyRent ? +form.monthlyRent : undefined,
-    }
-    setAssets(prev => [newAsset, ...prev])
-    toast(`تم إضافة الأصل "${newAsset.name}" بنجاح`, 'success')
-    setShowNew(false)
-    setForm(EMPTY_FORM)
+      const newAsset: FixedAsset = {
+        id: newId,
+        name: form.name.trim(),
+        category: form.category,
+        ownership: form.ownership,
+        purchaseDate: form.purchaseDate,
+        cost,
+        accumulated,
+        bookValue,
+        depRate,
+        status: form.status,
+        location: form.location || 'الرئيسي',
+        monthlyRent: form.ownership === 'rental' && form.monthlyRent ? +form.monthlyRent : undefined,
+      }
+      setAssets(prev => [newAsset, ...prev])
+      toast(`تم إضافة الأصل "${newAsset.name}" بنجاح`, 'success')
+      setShowNew(false)
+      setForm(EMPTY_FORM)
+    })
   }
 
   const totalCost        = assets.reduce((s, a) => s + a.cost, 0)
@@ -645,7 +649,7 @@ export default function FixedAssetsPage() {
           )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAdd}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAdd} disabled={saving}>
               <i className="fa fa-plus" /> إضافة الأصل
             </button>
             <button className="btn btn-outline" onClick={() => { setShowNew(false); setForm(EMPTY_FORM) }}>إلغاء</button>

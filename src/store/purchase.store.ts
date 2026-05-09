@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { PURCHASES, type Purchase, type PurchaseStatus } from '@/lib/mock-data/purchases'
 import { useInventoryStore } from './inventory.store'
 
@@ -29,11 +29,18 @@ export const usePurchaseStore = create<PurchaseStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('purchases').select('*, purchase_items(*)').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-        } else {
-          const mapped = (data || []).map((p: any): Purchase => ({
+        try {
+          // Fetch purchases and their items in two calls, then join client-side
+          const [purchasesData, itemsData] = await Promise.all([
+            supaFetch('purchases', { select: '*', limit: 500 }),
+            supaFetch('purchase_items', { select: '*', limit: 2000 }),
+          ])
+          const itemsByPurchase: Record<string, any[]> = {}
+          for (const it of (itemsData || [])) {
+            if (!itemsByPurchase[it.purchase_id]) itemsByPurchase[it.purchase_id] = []
+            itemsByPurchase[it.purchase_id].push(it)
+          }
+          const mapped = (purchasesData || []).map((p: any): Purchase => ({
             id: p.id,
             date: p.date,
             dueDate: p.due_date || undefined,
@@ -45,7 +52,7 @@ export const usePurchaseStore = create<PurchaseStore>()(
             total: Number(p.total) || 0,
             paid: Number(p.paid) || 0,
             status: p.status,
-            lineItems: (p.purchase_items || []).map((it: any) => ({
+            lineItems: (itemsByPurchase[p.id] || []).map((it: any) => ({
               description: it.description,
               productId: it.product_id || undefined,
               qty: it.qty,
@@ -55,6 +62,8 @@ export const usePurchaseStore = create<PurchaseStore>()(
             createdBy: p.created_by || undefined,
           }))
           set({ purchases: mapped, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
@@ -72,38 +81,46 @@ export const usePurchaseStore = create<PurchaseStore>()(
         const purchase: Purchase = { ...data, id: `PO-${year}-${String(n).padStart(3, '0')}` }
 
         if (isSupabaseConfigured()) {
-          const { data: inserted, error } = await supabase.from('purchases').insert({
-            number: purchase.id,
-            date: data.date,
-            due_date: data.dueDate || null,
-            supplier: data.supplier,
-            supplier_vat: data.supplierVat || null,
-            item_count: data.itemCount || 0,
-            amount: data.amount,
-            tax: data.tax,
-            total: data.total,
-            paid: data.paid || 0,
-            status: data.status,
-            created_by: data.createdBy || null,
-          }).select().single()
-          if (error) throw new Error(error.message)
+          const result = await supaFetch('purchases', {
+            method: 'POST',
+            body: {
+              number: purchase.id,
+              date: data.date,
+              due_date: data.dueDate || null,
+              supplier: data.supplier,
+              supplier_vat: data.supplierVat || null,
+              item_count: data.itemCount || 0,
+              amount: data.amount,
+              tax: data.tax,
+              total: data.total,
+              paid: data.paid || 0,
+              status: data.status,
+              created_by: data.createdBy || null,
+            },
+          })
+          const inserted = Array.isArray(result) ? result[0] : result
+          if (!inserted) throw new Error('Failed to insert purchase')
 
           if (data.lineItems.length > 0) {
-            await supabase.from('purchase_items').insert(
-              data.lineItems.map(it => ({
+            await supaFetch('purchase_items', {
+              method: 'POST',
+              body: data.lineItems.map(it => ({
                 purchase_id: inserted.id,
                 description: it.description,
                 product_id: it.productId || null,
                 qty: it.qty,
                 price: it.price,
                 total: it.total,
-              }))
-            )
+              })),
+            })
           }
           purchase.id = inserted.id
-          for (const item of data.lineItems) {
-            if (item.productId) {
-              await useInventoryStore.getState().addStock(item.productId, item.qty, `purchase_${purchase.id}`)
+          // Only add to stock if purchase is received (cash payment = received immediately)
+          if (data.status === 'received') {
+            for (const item of data.lineItems) {
+              if (item.productId) {
+                await useInventoryStore.getState().addStock(item.productId, item.qty, `purchase_${purchase.id}`)
+              }
             }
           }
         }
@@ -113,7 +130,9 @@ export const usePurchaseStore = create<PurchaseStore>()(
       },
 
       async updateStatus(id, status) {
-        if (isSupabaseConfigured()) await supabase.from('purchases').update({ status }).eq('id', id)
+        if (isSupabaseConfigured()) {
+          await supaFetch('purchases', { method: 'PATCH', filter: 'id=eq.' + id, body: { status } })
+        }
         set(state => ({ purchases: state.purchases.map(p => p.id === id ? { ...p, status } : p) }))
       },
 
@@ -124,19 +143,37 @@ export const usePurchaseStore = create<PurchaseStore>()(
         const newStatus: PurchaseStatus = newPaid >= purchase.total ? 'received' : 'partial'
 
         if (isSupabaseConfigured()) {
-          await supabase.from('purchases').update({ paid: newPaid, status: newStatus }).eq('id', id)
-          await supabase.from('treasury_transactions').insert({
-            date: new Date().toISOString().slice(0, 10),
-            description: `دفعة مشتريات ${purchase.id}`,
-            type: 'out', category: 'purchase', amount,
-            balance: -amount, account_id: 'cash', ref: purchase.id,
+          await supaFetch('purchases', {
+            method: 'PATCH',
+            filter: 'id=eq.' + id,
+            body: { paid: newPaid, status: newStatus },
+          })
+          await supaFetch('treasury_transactions', {
+            method: 'POST',
+            body: {
+              date: new Date().toISOString().slice(0, 10),
+              description: `دفعة مشتريات ${purchase.id}`,
+              type: 'out', category: 'purchase', amount,
+              balance: -amount, account_id: 'cash', ref: purchase.id,
+            },
           })
         }
         set(state => ({ purchases: state.purchases.map(p => p.id === id ? { ...p, paid: newPaid, status: newStatus } : p) }))
       },
 
       async confirmReceipt(id) {
-        if (isSupabaseConfigured()) await supabase.from('purchases').update({ status: 'received' }).eq('id', id)
+        if (isSupabaseConfigured()) {
+          await supaFetch('purchases', { method: 'PATCH', filter: 'id=eq.' + id, body: { status: 'received' } })
+          // Add to stock when confirmed as received
+          const purchase = get().purchases.find(p => p.id === id)
+          if (purchase && purchase.status !== 'received') {
+            for (const item of purchase.lineItems) {
+              if (item.productId) {
+                await useInventoryStore.getState().addStock(item.productId, item.qty, `confirm_${id}`)
+              }
+            }
+          }
+        }
         set(state => ({ purchases: state.purchases.map(p => p.id === id ? { ...p, status: 'received' as PurchaseStatus } : p) }))
       },
     }),

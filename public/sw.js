@@ -1,71 +1,68 @@
-const CACHE_NAME = 'sahl-v1'
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/favicon.svg',
-  '/icons.svg',
+const CACHE = 'sahl-v2'
+const BASE = '/sahl-react'
+const OFFLINE_PAGE = BASE + '/'
+
+const PRECACHE = [
+  BASE + '/',
+  BASE + '/favicon.svg',
 ]
 
-// Install: cache static assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS)
-    }).then(() => {
-      return self.skipWaiting()
-    })
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(PRECACHE))
+      .then(() => self.skipWaiting())
   )
 })
 
-// Activate: clean old caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      )
-    }).then(() => {
-      return self.clients.claim()
-    })
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   )
 })
 
-// Fetch: network-first strategy for API, cache-first for static
-self.addEventListener('fetch', (event) => {
-  const { request } = event
-
-  // Skip non-GET requests
+self.addEventListener('fetch', e => {
+  const { request } = e
   if (request.method !== 'GET') return
+  const url = new URL(request.url)
 
-  // For HTML pages: network first, fallback to cache
+  // Skip Supabase API calls — always network
+  if (url.hostname.includes('supabase.co')) return
+
   if (request.mode === 'navigate') {
-    event.respondWith(
+    e.respondWith(
       fetch(request)
-        .then((response) => {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-          return response
+        .then(res => {
+          const clone = res.clone()
+          caches.open(CACHE).then(c => c.put(request, clone))
+          return res
         })
-        .catch(() => {
-          return caches.match(request).then((cached) => cached || caches.match('/')
-        })
+        .catch(() => caches.match(OFFLINE_PAGE))
     )
     return
   }
 
-  // For static assets: cache first, fallback to network
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached
-      return fetch(request).then((response) => {
-        if (response.ok) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-        }
-        return response
+  // Cache-first for static assets (JS, CSS, fonts, images)
+  if (/\.(js|css|woff2?|png|svg|ico|jpg)$/.test(url.pathname)) {
+    e.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached
+        return fetch(request).then(res => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(CACHE).then(c => c.put(request, clone))
+          }
+          return res
+        })
       })
-    })
+    )
+    return
+  }
+
+  // Network-first for everything else
+  e.respondWith(
+    fetch(request).catch(() => caches.match(request))
   )
 })

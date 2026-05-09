@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { EMPLOYEES, type Employee } from '@/lib/mock-data/hr'
 
 interface HRStore {
@@ -23,10 +23,8 @@ export const useHRStore = create<HRStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-        } else {
+        try {
+          const data = await supaFetch('employees', { select: '*', limit: 500 })
           const mapped = (data || []).map((e: any): Employee => ({
             id: e.id,
             name: e.name,
@@ -43,6 +41,8 @@ export const useHRStore = create<HRStore>()(
             status: e.status || 'active',
           }))
           set({ employees: mapped, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
@@ -51,21 +51,23 @@ export const useHRStore = create<HRStore>()(
         const employee: Employee = { ...data, id }
 
         if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('employees').insert({
-            name: data.name,
-            position: data.position || null,
-            department: data.department || null,
-            salary: data.salary || 0,
-            allowances: data.allowances || 0,
-            deductions: data.deductions || 0,
-            net_salary: data.netSalary || 0,
-            phone: data.phone || null,
-            email: data.email || null,
-            iqama: data.iqama || null,
-            join_date: data.joinDate || null,
-            status: data.status || 'active',
+          await supaFetch('employees', {
+            method: 'POST',
+            body: {
+              name: data.name,
+              position: data.position || null,
+              department: data.department || null,
+              salary: data.salary || 0,
+              allowances: data.allowances || 0,
+              deductions: data.deductions || 0,
+              net_salary: data.netSalary || 0,
+              phone: data.phone || null,
+              email: data.email || null,
+              iqama: data.iqama || null,
+              join_date: data.joinDate || null,
+              status: data.status || 'active',
+            },
           })
-          if (error) throw new Error(error.message)
         }
         set(state => ({ employees: [...state.employees, employee] }))
       },
@@ -86,8 +88,7 @@ export const useHRStore = create<HRStore>()(
         if (data.status !== undefined) dbUpdates.status = data.status
 
         if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('employees').update(dbUpdates).eq('id', id)
-          if (error) throw new Error(error.message)
+          await supaFetch('employees', { method: 'PATCH', filter: 'id=eq.' + id, body: dbUpdates })
         }
         set(state => ({
           employees: state.employees.map(e => e.id === id ? { ...e, ...data } : e),

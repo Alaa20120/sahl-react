@@ -1,19 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
-import { useDelegateStore } from '@/store/delegate.store'
 import { toast } from '@/lib/toast'
 
 type LoginMode = 'admin' | 'delegate'
-
-// ── Default users for first login ─────────────────────────────
-// Admin account
-const ADMIN_CREDENTIALS = [
-  { email: 'admin', password: '123456', name: 'المدير', role: 'admin' as const },
-]
-
-// Default delegate account (hardcoded for initial access)
-const DEFAULT_DELEGATE = { username: 'mandoob', password: '123456', name: 'مندوب المبيعات' }
 
 export default function Login() {
   const [mode, setMode] = useState<LoginMode>('admin')
@@ -24,105 +14,137 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loginAttempts, setLoginAttempts] = useState(0)
   const [isLocked, setIsLocked] = useState(false)
+  const [errorBox, setErrorBox] = useState('')
   const navigate = useNavigate()
   const login = useAuthStore(s => s.login)
-  const validateDelegateLogin = useDelegateStore(s => s.validateLogin)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (isLocked) {
-      toast('تم قفل الحساب مؤقتاً — جرب بعد 5 دقائق', 'danger')
-      return
-    }
-
+    if (isLocked) { toast('الحساب مقفل مؤقتاً — جرب بعد 5 دقائق', 'danger'); return }
     if (loginAttempts >= 5) {
       setIsLocked(true)
+      setTimeout(() => { setIsLocked(false); setLoginAttempts(0) }, 5 * 60 * 1000)
       toast('تم قفل الحساب مؤقتاً — جرب بعد 5 دقائق', 'danger')
-      setTimeout(() => {
-        setIsLocked(false)
-        setLoginAttempts(0)
-      }, 5 * 60 * 1000)
       return
     }
 
     setLoading(true)
+    setErrorBox('')
+    try {
+      if (mode === 'admin') {
+        if (!email || !password) { toast('يرجى إدخال البريد وكلمة المرور', 'warn'); return }
 
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 600))
+        const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
+        const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-    if (mode === 'admin') {
-      if (!email || !password) {
-        toast('يرجى إدخال البريد وكلمة المرور', 'warn')
-        setLoading(false)
-        return
-      }
+        // Use direct fetch — bypasses supabase-js client issues
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('انتهت مهلة الاتصال')), 10000)
+        )
+        const authFetch = fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPA_KEY,
+            'Authorization': `Bearer ${SUPA_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: email.trim(), password }),
+        }).then(async r => {
+          const text = await r.text()
+          try { return JSON.parse(text) } catch { return { raw: text, status: r.status } }
+        })
 
-      const user = ADMIN_CREDENTIALS.find(u => u.email === email)
-      if (user) {
-        const valid = user.password === password
-        if (valid) {
-          login({ id: '1', name: user.name, email: user.email, role: user.role, company: 'شركة النور للتجارة' })
-          toast(`مرحباً ${user.name}!`, 'success')
-          setLoginAttempts(0)
-          navigate(user.role === 'admin' ? '/erp/dashboard' : '/erp/invoices')
-          setLoading(false)
+        const authData = await Promise.race([authFetch, timeout]) as any
+
+        // Show raw response for debugging
+        if (!authData?.access_token) {
+          setErrorBox(`Supabase response: ${JSON.stringify(authData)}`)
           return
         }
-      }
-      setLoginAttempts(prev => prev + 1)
-      toast('بيانات الدخول غير صحيحة', 'danger')
-    } else {
-      // Delegate login — check default delegate first, then delegate store
-      if (!username || !password) {
-        toast('يرجى إدخال اسم المستخدم وكلمة المرور', 'warn')
-        setLoading(false)
-        return
-      }
 
-      // Check default delegate account
-      if (username === DEFAULT_DELEGATE.username && password === DEFAULT_DELEGATE.password) {
+        const user = authData.user
+        const meta = user?.user_metadata || {}
         login({
-          id: 'DEL-DEFAULT',
-          name: DEFAULT_DELEGATE.name,
-          email: '',
-          role: 'delegate',
-          company: 'شركة سهل التقنية',
-          delegateId: 'DEL-DEFAULT',
+          id: user.id,
+          name: meta.name || user.email?.split('@')[0] || 'مدير',
+          email: user.email || '',
+          role: (meta.role || 'admin') as any,
+          company: import.meta.env.VITE_COMPANY_NAME || 'سهل',
+          accessToken: authData.access_token,
         })
-        toast(`مرحباً ${DEFAULT_DELEGATE.name}!`, 'success')
         setLoginAttempts(0)
-        navigate('/delegate/home')
-        setLoading(false)
-        return
-      }
+        // Force hard navigation to avoid React Router issues
+        window.location.href = '/sahl-react/erp/dashboard'
 
-      // Check delegate store
-      const delegate = validateDelegateLogin(username, password)
-      if (delegate) {
-        if (delegate.status !== 'active') {
+      } else {
+        // Delegate login
+        if (!username || !password) { toast('يرجى إدخال اسم المستخدم وكلمة المرور', 'warn'); return }
+
+        // Use direct fetch (bypasses supabase-js client issues)
+        const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
+        const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('انتهت مهلة الاتصال — Supabase REST API لا يستجيب')), 8000)
+        )
+
+        const fetchDelegate = fetch(
+          `${SUPA_URL}/rest/v1/delegates?username=eq.${encodeURIComponent(username.trim())}&select=id,name,phone,email,zone,status,username,password_hash,avatar&limit=1`,
+          { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
+        ).then(r => r.json())
+
+        const rows = await Promise.race([fetchDelegate, timeout]) as any[]
+
+        const dbDelegate = Array.isArray(rows) ? rows[0] : null
+
+        if (!Array.isArray(rows)) {
+          setErrorBox(`خطأ في الاستجابة: ${JSON.stringify(rows)}`)
+          return
+        }
+
+        if (!dbDelegate) {
+          setLoginAttempts(p => p + 1)
+          setErrorBox(`لم يُعثر على مستخدم باسم: "${username.trim()}"`)
+          return
+        }
+
+        if (dbDelegate.password_hash !== password.trim()) {
+          setLoginAttempts(p => p + 1)
+          setErrorBox(`كلمة المرور غير صحيحة`)
+          return
+        }
+
+        const delegateData = {
+          id: dbDelegate.id, name: dbDelegate.name,
+          phone: dbDelegate.phone || '', email: dbDelegate.email || '',
+          zone: dbDelegate.zone || '', status: dbDelegate.status,
+          username: dbDelegate.username, password: dbDelegate.password_hash,
+          avatar: dbDelegate.avatar || '',
+          location: { lat: 24.7136, lng: 46.6753, address: 'غير محدد', timestamp: new Date().toISOString() },
+          locationHistory: [], warehouse: [], invoices: [], transactions: [],
+          stats: { totalSales: 0, totalPurchases: 0, collected: 0, balance: 0, externalCredit: 0, expenses: 0, companyEntrusted: 0 },
+        }
+
+        if (delegateData.status !== 'active') {
           toast('هذا الحساب موقوف — تواصل مع الإدارة', 'danger')
-          setLoading(false)
           return
         }
+
         login({
-          id: delegate.id,
-          name: delegate.name,
-          email: delegate.email,
-          role: 'delegate',
-          company: 'شركة سهل التقنية',
-          delegateId: delegate.id,
+          id: delegateData.id, name: delegateData.name,
+          email: delegateData.email, role: 'delegate',
+          company: import.meta.env.VITE_COMPANY_NAME || 'سهل',
+          delegateId: delegateData.id,
         })
-        toast(`مرحباً ${delegate.name}!`, 'success')
+        toast(`مرحباً ${delegateData.name}!`, 'success')
         setLoginAttempts(0)
         navigate('/delegate/home')
-        setLoading(false)
-        return
       }
-      setLoginAttempts(prev => prev + 1)
-      toast('اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
+    } catch (err: any) {
+      setErrorBox(`خطأ غير متوقع: ${err?.message || 'حاول مرة أخرى'}`)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -261,6 +283,17 @@ export default function Login() {
             <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 12, padding: '8px 12px', background: 'var(--danger-bg)', borderRadius: 8 }}>
               <i className="fa fa-exclamation-triangle" style={{ marginLeft: 6 }} />
               محاولات خاطئة: {loginAttempts} / 5
+            </div>
+          )}
+
+          {errorBox && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #EF4444', borderRadius: 10,
+              padding: '12px 14px', marginBottom: 16, fontSize: 12,
+              color: '#B91C1C', wordBreak: 'break-all', lineHeight: 1.6,
+            }}>
+              <i className="fa fa-exclamation-circle" style={{ marginLeft: 6 }} />
+              {errorBox}
             </div>
           )}
 

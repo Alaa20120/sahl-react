@@ -8,6 +8,7 @@ import { EXPENSE_CATEGORIES, type ExpenseType } from '@/lib/mock-data/expenses'
 import { useExpenseStore } from '@/store/expense.store'
 import { useHRStore } from '@/store/hr.store'
 import { toast } from '@/lib/toast'
+import { useSaving } from '@/lib/useSaving'
 
 const STATUS_COLORS = { approved: 'var(--success)', pending: 'var(--warn)', rejected: 'var(--danger)' }
 const STATUS_LABELS = { approved: 'معتمد', pending: 'قيد المراجعة', rejected: 'مرفوض' }
@@ -17,12 +18,14 @@ const BLANK = { employee: '', category: EXPENSE_CATEGORIES[1] ?? 'مصروفات
 export default function ExpensesPage() {
   const { expenses, addExpense, updateStatus } = useExpenseStore()
   const employees = useHRStore(s => s.employees)
+  const { saving, run } = useSaving()
 
   const [typeFilter, setTypeFilter] = useState<'all' | ExpenseType>('all')
   const [catFilter, setCatFilter] = useState('الكل')
   const [showNew, setShowNew] = useState(false)
   const [newType, setNewType] = useState<ExpenseType>('expense')
   const [form, setForm] = useState(BLANK)
+  const [saveError, setSaveError] = useState('')
 
   const filtered = expenses.filter(e => {
     const matchType = typeFilter === 'all' || e.type === typeFilter
@@ -30,7 +33,6 @@ export default function ExpensesPage() {
     return matchType && matchCat
   })
 
-  // Real stats from store
   const stats = useMemo(() => ({
     totalExpenses: expenses.filter(e => e.type === 'expense' && e.status === 'approved').reduce((s, e) => s + e.amount, 0),
     totalAdvances: expenses.filter(e => e.type === 'advance' && e.status === 'approved').reduce((s, e) => s + e.amount, 0),
@@ -43,28 +45,23 @@ export default function ExpensesPage() {
     const amount = parseFloat(form.amount)
     if (!amount || amount <= 0) { toast('أدخل مبلغاً صحيحاً', 'warn'); return }
     if (!form.description.trim()) { toast('أدخل البيان', 'warn'); return }
-    addExpense({
-      date: form.date,
-      employee: form.employee.trim(),
-      category: form.category,
-      description: form.description.trim(),
-      type: newType,
-      amount,
-      status: 'pending',
-    })
-    toast('تم تقديم الطلب — في انتظار الموافقة', 'success')
-    setShowNew(false)
-    setForm(BLANK)
+    setSaveError('')
+    run(async () => {
+      await addExpense({ date: form.date, employee: form.employee.trim(), category: form.category, description: form.description.trim(), type: newType, amount, status: 'pending' })
+      toast('تم تقديم الطلب — في انتظار الموافقة', 'success')
+      setShowNew(false)
+      setForm(BLANK)
+    }).catch((err: any) => setSaveError(err?.message || 'فشل الحفظ — حاول مرة أخرى'))
   }
 
   function handleApprove(id: string) {
-    updateStatus(id, 'approved')
-    toast('تمت الموافقة على الطلب', 'success')
+    run(async () => { await updateStatus(id, 'approved'); toast('تمت الموافقة', 'success') })
+      .catch(() => toast('خطأ في التحديث', 'danger'))
   }
 
   function handleReject(id: string) {
-    updateStatus(id, 'rejected')
-    toast('تم رفض الطلب', 'warn')
+    run(async () => { await updateStatus(id, 'rejected'); toast('تم الرفض', 'warn') })
+      .catch(() => toast('خطأ في التحديث', 'danger'))
   }
 
   return (
@@ -160,7 +157,9 @@ export default function ExpensesPage() {
       <Modal open={showNew} onClose={() => setShowNew(false)} title="طلب مصروف أو سلفة"
         footer={<>
           <button className="btn btn-outline" onClick={() => setShowNew(false)}>إلغاء</button>
-          <button className="btn btn-primary" onClick={handleSave}><i className="fa fa-paper-plane" /> تقديم الطلب</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? <><i className="fa fa-spinner fa-spin" /> جارٍ الحفظ...</> : <><i className="fa fa-paper-plane" /> تقديم الطلب</>}
+          </button>
         </>}
       >
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -207,6 +206,11 @@ export default function ExpensesPage() {
             <textarea className="form-control" rows={3} placeholder="وصف المصروف أو سبب السلفة..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'none' }} />
           </div>
         </div>
+        {saveError && (
+          <div style={{ marginTop: 14, background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--danger)' }}>
+            <i className="fa fa-exclamation-circle" style={{ marginLeft: 6 }} />{saveError}
+          </div>
+        )}
       </Modal>
     </>
   )

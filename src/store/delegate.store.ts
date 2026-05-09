@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import {
   DELEGATES,
   type Delegate,
@@ -8,6 +8,8 @@ import {
   type DelegateWarehouseItem,
   type DelegateInvoice,
 } from '@/lib/mock-data/delegates'
+import { useTreasuryStore } from './treasury.store'
+import { useInventoryStore } from './inventory.store'
 
 interface DelegateStore {
   delegates: Delegate[]
@@ -50,18 +52,16 @@ export const useDelegateStore = create<DelegateStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('delegates').select('*').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-          return
-        }
-        // Fetch related data for each delegate
-        const delegatesWithData = await Promise.all((data || []).map(async (d: any) => {
-          const [whRes, invRes, txRes] = await Promise.all([
-            supabase.from('delegate_warehouse').select('*').eq('delegate_id', d.id),
-            supabase.from('delegate_invoices').select('*, delegate_invoice_items(*)').eq('delegate_id', d.id),
-            supabase.from('delegate_transactions').select('*').eq('delegate_id', d.id),
-          ])
+        try {
+          const data = await supaFetch('delegates', { select: '*', limit: 200 })
+          if (!Array.isArray(data) || data.length === 0) { set({ loading: false }); return }
+
+          const delegatesWithData = await Promise.all(data.map(async (d: any) => {
+            const [wh, inv, tx] = await Promise.all([
+              supaFetch('delegate_warehouse', { filter: `delegate_id=eq.${d.id}`, limit: 500 }).catch(() => []),
+              supaFetch('delegate_invoices', { filter: `delegate_id=eq.${d.id}`, limit: 500 }).catch(() => []),
+              supaFetch('delegate_transactions', { filter: `delegate_id=eq.${d.id}`, limit: 500 }).catch(() => []),
+            ])
           return {
             id: d.id,
             name: d.name,
@@ -74,22 +74,19 @@ export const useDelegateStore = create<DelegateStore>()(
             avatar: d.avatar || d.name.split(' ').slice(0, 2).map((w: string) => w[0]).join(''),
             location: { lat: d.location_lat || 24.7136, lng: d.location_lng || 46.6753, address: d.location_address || 'غير محدد', timestamp: new Date().toISOString() },
             locationHistory: [],
-            warehouse: (whRes.data || []).map((w: any): DelegateWarehouseItem => ({
+            warehouse: (Array.isArray(wh) ? wh : []).map((w: any): DelegateWarehouseItem => ({
               id: w.id, productId: w.product_id, productName: w.product_name, productSku: w.product_sku,
               qty: w.qty, costPrice: Number(w.cost_price) || 0, receivedDate: w.received_date,
               status: w.status, source: w.source,
             })),
-            invoices: (invRes.data || []).map((i: any): DelegateInvoice => ({
+            invoices: (Array.isArray(inv) ? inv : []).map((i: any): DelegateInvoice => ({
               id: i.id, number: i.number, date: i.date, type: i.type, party: i.party,
-              customerId: i.customer_id, items: (i.delegate_invoice_items || []).map((it: any) => ({
-                productId: it.product_id, description: it.description, qty: it.qty,
-                price: Number(it.price) || 0, total: Number(it.total) || 0,
-              })),
+              customerId: i.customer_id, items: [],
               subtotal: Number(i.subtotal) || 0, tax: Number(i.tax) || 0, total: Number(i.total) || 0,
               paidAmount: Number(i.paid_amount) || 0, status: i.status,
               paymentMethod: i.payment_method, confirmedAt: i.confirmed_at,
             })),
-            transactions: (txRes.data || []).map((t: any): DelegateTransaction => ({
+            transactions: (Array.isArray(tx) ? tx : []).map((t: any): DelegateTransaction => ({
               id: t.id, date: t.date, type: t.type, amount: Number(t.amount) || 0,
               description: t.description || '', reference: t.reference,
               balanceAfter: Number(t.balance_after) || 0,
@@ -106,10 +103,15 @@ export const useDelegateStore = create<DelegateStore>()(
           } as Delegate
         }))
         set({ delegates: delegatesWithData, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
+        }
       },
 
       async addDelegate({ name, phone, email, zone, username, password }) {
-        const id = `DEL-${String(get().delegates.length + 1).padStart(3, '0')}`
+        // Use timestamp-based ID to avoid conflicts
+        const id = `DEL-${Date.now()}`
+
         const avatar = name.split(' ').slice(0, 2).map(w => w[0]).join('')
         const finalUsername = username?.trim() || generateUsername(name)
         const finalPassword = password || generatePassword()
@@ -121,29 +123,49 @@ export const useDelegateStore = create<DelegateStore>()(
           avatar,
           location: { lat: 24.7136, lng: 46.6753, address: 'غير محدد', timestamp: new Date().toISOString() },
           locationHistory: [],
-          warehouse: [],
-          invoices: [],
-          transactions: [],
+          warehouse: [], invoices: [], transactions: [],
           stats: { totalSales: 0, totalPurchases: 0, collected: 0, balance: 0, externalCredit: 0, expenses: 0, companyEntrusted: 0 },
         }
 
         if (isSupabaseConfigured()) {
-          await supabase.from('delegates').insert({
-            id, name, phone: phone || null, email: email || null, zone: zone || null,
-            username: finalUsername, password_hash: finalPassword, avatar,
+          const inserted = await supaFetch('delegates', {
+            method: 'POST',
+            body: {
+              id, name,
+              phone: phone || null,
+              email: email || null,
+              zone: zone || null,
+              username: finalUsername,
+              password_hash: finalPassword,
+              avatar,
+              status: 'active',
+            },
+            select: 'id',
           })
+          const row = Array.isArray(inserted) ? inserted[0] : inserted
+          if (!row?.id) throw new Error('لم يتم التأكد من الحفظ في قاعدة البيانات')
+          newDel.id = row.id
         }
         set(state => ({ delegates: [...state.delegates, newDel] }))
         return newDel
       },
 
       async setDelegateStatus(delegateId, status) {
-        if (isSupabaseConfigured()) await supabase.from('delegates').update({ status }).eq('id', delegateId)
+        if (isSupabaseConfigured()) {
+          await supaFetch('delegates', { method: 'PATCH', filter: `id=eq.${delegateId}`, body: { status } })
+        }
         set(state => ({ delegates: state.delegates.map(d => d.id === delegateId ? { ...d, status } : d) }))
       },
 
       validateLogin(username, password) {
-        return get().delegates.find(d => d.username === username && d.password === password) || null
+        // Check local store first (already fetched)
+        const local = get().delegates.find(d => d.username === username && d.password === password)
+        if (local) return local
+        // Also check with trimmed values in case of whitespace
+        return get().delegates.find(d =>
+          d.username?.trim() === username?.trim() &&
+          d.password?.trim() === password?.trim()
+        ) || null
       },
 
       async addInvoice(delegateId, invoice) {
@@ -317,10 +339,12 @@ export const useDelegateStore = create<DelegateStore>()(
       },
 
       async transferToMainWarehouse(delegateId, warehouseItemId, qty) {
-        if (isSupabaseConfigured()) {
-          const item = get().delegates.find(d => d.id === delegateId)?.warehouse.find(w => w.id === warehouseItemId)
-          if (item) {
-            await supabase.from('delegate_warehouse').update({ qty: item.qty - qty }).eq('id', warehouseItemId)
+        const item = get().delegates.find(d => d.id === delegateId)?.warehouse.find(w => w.id === warehouseItemId)
+        if (isSupabaseConfigured() && item) {
+          await supabase.from('delegate_warehouse').update({ qty: item.qty - qty }).eq('id', warehouseItemId)
+          // Sync back to main inventory
+          if (item.productId) {
+            await useInventoryStore.getState().addStock(item.productId, qty, `delegate_return_${delegateId}`)
           }
         }
         set(state => ({
@@ -332,18 +356,31 @@ export const useDelegateStore = create<DelegateStore>()(
       },
 
       async remitToCompany(delegateId, amount, description) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        const today = new Date().toISOString().slice(0, 10)
+        const ref = `REM-${Date.now()}`
         if (isSupabaseConfigured()) {
           await supabase.from('delegate_transactions').insert({
-            delegate_id: delegateId, date: new Date().toISOString().slice(0, 10),
-            type: 'remittance', amount: -amount, description,
-            reference: `REM-${Date.now()}`,
+            delegate_id: delegateId, date: today,
+            type: 'remittance', amount: -amount, description, reference: ref,
+            balance_after: (delegate?.stats.balance || 0) - amount,
+          })
+          // Sync to main treasury as incoming cash
+          await useTreasuryStore.getState().addTransaction({
+            date: today,
+            description: `تحصيل من مندوب: ${delegate?.name || delegateId} - ${description}`,
+            type: 'in',
+            category: 'collection',
+            amount,
+            account: 'cash',
+            ref,
           })
         }
         set(state => ({
           delegates: state.delegates.map(d => {
             if (d.id !== delegateId) return d
-            const tx: DelegateTransaction = { id: `TRX-${Date.now()}`, date: new Date().toISOString().slice(0, 10), type: 'remittance', amount: -amount, description, reference: `REM-${Date.now()}`, balanceAfter: d.stats.balance }
-            return { ...d, transactions: [tx, ...d.transactions], stats: { ...d.stats, companyEntrusted: Math.max(0, d.stats.companyEntrusted - amount) } }
+            const tx: DelegateTransaction = { id: `TRX-${Date.now()}`, date: today, type: 'remittance', amount: -amount, description, reference: ref, balanceAfter: d.stats.balance - amount }
+            return { ...d, transactions: [tx, ...d.transactions], stats: { ...d.stats, balance: Math.max(0, d.stats.balance - amount) } }
           }),
         }))
       },

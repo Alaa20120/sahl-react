@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from '@/components/layout/AppShell'
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
+import InvoiceView from '@/pages/InvoiceView'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth.store'
 import { useCustomerStore } from '@/store/customer.store'
@@ -14,6 +15,7 @@ import { useExpenseStore } from '@/store/expense.store'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { useHRStore } from '@/store/hr.store'
 import { useDelegateStore } from '@/store/delegate.store'
+import { useCategoryStore } from '@/store/category.store'
 
 // ERP core
 const Dashboard        = lazy(() => import('@/modules/erp/dashboard/DashboardPage'))
@@ -77,11 +79,11 @@ const S = (C: React.ComponentType) => (
 )
 
 function AppDataProvider() {
-  const fetchUser = useAuthStore(s => s.fetchUser)
+  const initAuth = useAuthStore(s => s.initAuth)
 
   useEffect(() => {
-    // Fetch user on mount
-    fetchUser()
+    // Init Supabase auth listener — handles session restore on refresh automatically
+    const unsubscribe = initAuth()
 
     // Fetch all data if Supabase is configured
     if (isSupabaseConfigured()) {
@@ -93,8 +95,11 @@ function AppDataProvider() {
       useTreasuryStore.getState().fetch()
       useHRStore.getState().fetch()
       useDelegateStore.getState().fetch()
+      useCategoryStore.getState().fetch()
     }
-  }, [fetchUser])
+
+    return unsubscribe
+  }, [initAuth])
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
@@ -119,13 +124,36 @@ function AppDataProvider() {
   return null
 }
 
+function PWAInstallButton() {
+  const [prompt, setPrompt] = useState<any>(null)
+
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  if (!prompt) return null
+  return (
+    <button
+      id="pwa-install-btn"
+      onClick={() => { prompt.prompt(); prompt.userChoice.then(() => setPrompt(null)) }}
+    >
+      <i className="fa fa-download" />
+      ثبّت التطبيق
+    </button>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter basename="/sahl-react">
       <AppDataProvider />
+      <PWAInstallButton />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/invoice/:number" element={<InvoiceView />} />
 
         {/* ERP — محمي بتسجيل الدخول (admin & staff only) */}
         <Route path="/erp" element={<ProtectedRoute allowedRoles={['admin', 'accountant', 'cashier', 'hr', 'readonly']}><AppShell /></ProtectedRoute>}>

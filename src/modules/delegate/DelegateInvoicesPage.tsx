@@ -29,7 +29,7 @@ export default function DelegateInvoicesPage() {
   const [filter, setFilter] = useState<'all' | 'sale' | 'purchase'>('all')
   const filtered = invoices.filter(inv => filter === 'all' || inv.type === filter)
 
-  function handleConfirm(id: string) {
+  async function handleConfirm(id: string) {
     const result = confirmDelegateInvoice(delegateId, id)
     if (!result.success) {
       toast(`تعذر التأكيد: "${result.failedItem}" — الكمية غير كافية في المستودع`, 'danger')
@@ -37,11 +37,15 @@ export default function DelegateInvoicesPage() {
     }
     // Sync main inventory
     const inv = invoices.find(i => i.id === id)
-    if (inv) {
-      const catalogItems = (inv.items ?? []).filter((it: any) => it.productId && PRODUCTS.some((p: any) => p.id === it.productId))
-      if (catalogItems.length > 0) deductFromInventory(catalogItems.map((it: any) => ({ productId: it.productId, qty: it.qty })))
+    try {
+      if (inv) {
+        const catalogItems = (inv.items ?? []).filter((it: any) => it.productId && PRODUCTS.some((p: any) => p.id === it.productId))
+        if (catalogItems.length > 0) await deductFromInventory(catalogItems.map((it: any) => ({ productId: it.productId, qty: it.qty })))
+      }
+      toast('تم تأكيد التسليم وخصم المخزون', 'success')
+    } catch (err: any) {
+      toast(`خطأ في خصم المخزون: ${err?.message || 'حاول مرة أخرى'}`, 'danger')
     }
-    toast('تم تأكيد التسليم وخصم المخزون', 'success')
   }
 
   return (

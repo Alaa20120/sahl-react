@@ -6,7 +6,13 @@ interface Props {
   invoiceDate: string
   totalWithVat: number
   vatAmount: number
+  invoiceNumber?: string
   size?: number
+}
+
+function buildViewUrl(invoiceNumber: string): string {
+  const base = window.location.origin + '/sahl-react/invoice/' + encodeURIComponent(invoiceNumber)
+  return base
 }
 
 function encodeTLV(tag: number, value: string): Uint8Array {
@@ -34,8 +40,12 @@ function buildZATCAQR(seller: string, vat: string, date: string, total: number, 
   return btoa(String.fromCharCode(...buf))
 }
 
-export default function ZATCAQRCode({ sellerName, vatNumber, invoiceDate, totalWithVat, vatAmount, size = 80 }: Props) {
-  const qrValue = buildZATCAQR(sellerName, vatNumber, invoiceDate, totalWithVat, vatAmount)
+export default function ZATCAQRCode({ sellerName, vatNumber, invoiceDate, totalWithVat, vatAmount, invoiceNumber, size = 80 }: Props) {
+  // If we have an invoice number, encode the view URL so scanning opens the invoice page
+  const qrValue = invoiceNumber
+    ? buildViewUrl(invoiceNumber)
+    : buildZATCAQR(sellerName, vatNumber, invoiceDate, totalWithVat, vatAmount)
+
   return (
     <div style={{ display: 'inline-block' }}>
       <QRCodeSVG

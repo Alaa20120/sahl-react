@@ -51,7 +51,7 @@ export default function DelegatePage() {
   const [newParty, setNewParty] = useState('')
   const [newPartyId, setNewPartyId] = useState('')
   const [newPaymentMethod, setNewPaymentMethod] = useState<'cash' | 'credit'>('cash')
-  const [newItems, setNewItems] = useState<{productId:string; desc:string; qty:number; price:number}[]>([])
+  const [newItems, setNewItems] = useState<{productId:string; desc:string; qty:string; price:string}[]>([])
 
   const [showPartyPicker, setShowPartyPicker] = useState(false)
   const [partySearch, setPartySearch] = useState('')
@@ -97,7 +97,7 @@ export default function DelegatePage() {
     : availableProducts
 
   function handleAddItem() {
-    setNewItems([...newItems, { productId: '', desc: '', qty: 1, price: 0 }])
+    setNewItems([...newItems, { productId: '', desc: '', qty: '1', price: '' }])
   }
 
   function handleUpdateItem(idx: number, field: string, value: string | number) {
@@ -112,7 +112,7 @@ export default function DelegatePage() {
     const price = newInvType === 'sale' ? product.sellPrice : product.costPrice
     handleUpdateItem(idx, 'productId', product.id)
     handleUpdateItem(idx, 'desc', product.name)
-    handleUpdateItem(idx, 'price', price)
+    handleUpdateItem(idx, 'price', String(price))
     setShowProductPicker(false)
     setProductSearch('')
   }
@@ -147,7 +147,7 @@ export default function DelegatePage() {
       toast('أكمل بيانات جميع الأصناف', 'warn'); return
     }
 
-    const subtotal = newItems.reduce((s, it) => s + it.qty * it.price, 0)
+    const subtotal = newItems.reduce((s, it) => s + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0), 0)
     const tax = subtotal * 0.15
     const total = subtotal + tax
 
@@ -169,7 +169,7 @@ export default function DelegatePage() {
       type: newInvType,
       party: newParty,
       customerId: newPartyId || undefined,
-      items: newItems.map(it => ({ productId: it.productId, description: it.desc, qty: it.qty, price: it.price, total: it.qty * it.price })),
+      items: newItems.map(it => { const q = parseFloat(it.qty)||0; const p = parseFloat(it.price)||0; return { productId: it.productId, description: it.desc, qty: q, price: p, total: q*p } }),
       subtotal,
       tax,
       total,
@@ -193,7 +193,7 @@ export default function DelegatePage() {
           productName: item.desc,
           productSku: catalogProduct?.sku || item.productId || '',
           qty: item.qty,
-          costPrice: item.price,
+          costPrice: parseFloat(item.price) || 0,
           receivedDate: new Date().toISOString().slice(0, 10),
           source: 'purchased',
         })
@@ -603,11 +603,11 @@ export default function DelegatePage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
                       <div>
                         <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>الكمية</label>
-                        <input className="form-control" type="text" inputMode="decimal" value={it.qty} onChange={e => handleUpdateItem(idx, 'qty', e.target.value.replace(/[^0-9]/g, '') || '0')} placeholder="الكمية" />
+                        <input className="form-control" type="text" inputMode="decimal" value={it.qty} onChange={e => handleUpdateItem(idx, 'qty', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="الكمية" />
                       </div>
                       <div>
                         <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>السعر</label>
-                        <input className="form-control" type="text" inputMode="decimal" value={it.price} onChange={e => handleUpdateItem(idx, 'price', e.target.value.replace(/[^0-9.]/g, '') || '0')} placeholder="السعر" />
+                        <input className="form-control" type="text" inputMode="decimal" value={it.price} onChange={e => handleUpdateItem(idx, 'price', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="السعر" />
                       </div>
                       <button className="btn btn-sm btn-outline" style={{ marginTop: 18, padding: '8px 12px' }} onClick={() => handleRemoveItem(idx)}><i className="fa fa-trash" style={{ color: 'var(--danger)' }} /></button>
                     </div>
@@ -622,7 +622,7 @@ export default function DelegatePage() {
               <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '16px 20px', marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                   <span style={{ color: 'var(--muted)' }}>الإجمالي</span>
-                  <span style={{ fontWeight: 700 }}>{fmt(newItems.reduce((s, it) => s + it.qty * it.price, 0))}</span>
+                  <span style={{ fontWeight: 700 }}>{fmt(newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0))}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                   <span style={{ color: 'var(--muted)' }}>الضريبة (15%)</span>

@@ -43,20 +43,21 @@ export default function DelegatesListPage() {
   const totalBalance = delegates.reduce((s, d) => s + (d.stats.totalSales - d.stats.totalPurchases), 0)
   const totalCredit = delegates.reduce((s, d) => s + d.stats.externalCredit, 0)
 
-  function handleAdd() {
+  const [addingDelegate, setAddingDelegate] = useState(false)
+
+  async function handleAdd() {
     if (!form.name.trim() || !form.phone.trim()) { toast('أدخل الاسم ورقم الهاتف', 'warn'); return }
-    const newDel = addDelegate(form)
-    toast(`تم إضافة المندوب "${form.name}" بنجاح`, 'success')
-    setShowNew(false)
-    // Show credentials modal
-    if (newDel) {
-      setShowCredentials({
-        name: newDel.name,
-        username: newDel.username,
-        password: newDel.password,
-      })
+    setAddingDelegate(true)
+    try {
+      const newDel = await addDelegate(form)
+      setShowNew(false)
+      setForm({ name: '', phone: '', email: '', zone: ZONES[0], username: '', password: '' })
+      setShowCredentials({ name: newDel.name, username: newDel.username, password: newDel.password })
+      toast(`تم إضافة المندوب "${newDel.name}" بنجاح`, 'success')
+    } catch (err: any) {
+      toast(`خطأ: ${err?.message || 'فشل إضافة المندوب'}`, 'danger')
     }
-    setForm({ name: '', phone: '', email: '', zone: ZONES[0], username: '', password: '' })
+    setAddingDelegate(false)
   }
 
   function handleToggle(e: React.MouseEvent, delegateId: string, currentStatus: string) {
@@ -211,7 +212,9 @@ export default function DelegatesListPage() {
       <Modal open={showNew} onClose={() => setShowNew(false)} title="إضافة مندوب جديد" footer={
         <>
           <button className="btn btn-outline" onClick={() => setShowNew(false)}>إلغاء</button>
-          <button className="btn btn-primary" onClick={handleAdd}><i className="fa fa-save" /> حفظ</button>
+          <button className="btn btn-primary" onClick={handleAdd} disabled={addingDelegate}>
+            {addingDelegate ? <><i className="fa fa-spinner fa-spin" /> جارٍ الحفظ...</> : <><i className="fa fa-save" /> حفظ</>}
+          </button>
         </>
       }>
         <div className="form-grid-2">

@@ -13,6 +13,7 @@ import { useTreasuryStore } from '@/store/treasury.store'
 import { useExpenseStore } from '@/store/expense.store'
 import { printPayslip } from '@/lib/print'
 import { toast } from '@/lib/toast'
+import { useSaving } from '@/lib/useSaving'
 
 // ── Fixed Assets imports ──
 import { FIXED_ASSETS, ASSET_CATEGORIES, type AssetStatus, type AssetOwnership, type FixedAsset } from '@/lib/mock-data/fixed-assets'
@@ -48,6 +49,7 @@ const USER_ROLE_COLORS: Record<UserRole, string> = { admin: '#7C3AED', accountan
 const USER_AVATAR_COLORS = ['#2563EB','#7C3AED','#10B981','#D97706','#DC2626','#0891B2','#059669','#6B7280']
 
 export default function HRPage() {
+  const { saving, run } = useSaving()
   const navigate = useNavigate()
   const employees = useHRStore(s => s.employees)
   const addEmployee = useHRStore(s => s.addEmployee)
@@ -186,23 +188,25 @@ export default function HRPage() {
     if (!assetForm.purchaseDate) { toast('يرجى تحديد تاريخ الشراء', 'warn'); return }
     if (!assetForm.cost || +assetForm.cost <= 0) { toast('يرجى إدخال تكلفة صحيحة', 'warn'); return }
 
-    const cost = +assetForm.cost
-    const depRate = +assetForm.depRate
-    const newId = `FA-${String(assets.length + 1).padStart(3, '0')}`
-    const yearsSince = (new Date().getFullYear() - new Date(assetForm.purchaseDate).getFullYear())
-    const accumulated = Math.min((cost * depRate / 100) * Math.max(yearsSince, 0), cost)
-    const bookValue = Math.max(cost - accumulated, 0)
+    run(async () => {
+      const cost = +assetForm.cost
+      const depRate = +assetForm.depRate
+      const newId = `FA-${String(assets.length + 1).padStart(3, '0')}`
+      const yearsSince = (new Date().getFullYear() - new Date(assetForm.purchaseDate).getFullYear())
+      const accumulated = Math.min((cost * depRate / 100) * Math.max(yearsSince, 0), cost)
+      const bookValue = Math.max(cost - accumulated, 0)
 
-    const newAsset: FixedAsset = {
-      id: newId, name: assetForm.name.trim(), category: assetForm.category, ownership: assetForm.ownership,
-      purchaseDate: assetForm.purchaseDate, cost, accumulated, bookValue, depRate,
-      status: assetForm.status, location: assetForm.location || 'الرئيسي',
-      monthlyRent: assetForm.ownership === 'rental' && assetForm.monthlyRent ? +assetForm.monthlyRent : undefined,
-    }
-    setAssets(prev => [newAsset, ...prev])
-    toast(`تم إضافة الأصل "${newAsset.name}" بنجاح`, 'success')
-    setShowNewAsset(false)
-    setAssetForm(EMPTY_ASSET_FORM)
+      const newAsset: FixedAsset = {
+        id: newId, name: assetForm.name.trim(), category: assetForm.category, ownership: assetForm.ownership,
+        purchaseDate: assetForm.purchaseDate, cost, accumulated, bookValue, depRate,
+        status: assetForm.status, location: assetForm.location || 'الرئيسي',
+        monthlyRent: assetForm.ownership === 'rental' && assetForm.monthlyRent ? +assetForm.monthlyRent : undefined,
+      }
+      setAssets(prev => [newAsset, ...prev])
+      toast(`تم إضافة الأصل "${newAsset.name}" بنجاح`, 'success')
+      setShowNewAsset(false)
+      setAssetForm(EMPTY_ASSET_FORM)
+    })
   }
 
   const handleRental = () => {
@@ -235,30 +239,32 @@ export default function HRPage() {
       return
     }
 
-    // Deduct from treasury
-    addTransaction({
-      date: new Date().toISOString().slice(0, 10),
-      description: `${expenseForm.type} - ${expenseForm.employee} (${expenseForm.reason})`,
-      type: 'out',
-      category: 'expense',
-      amount: amt,
-      account: expenseForm.account
-    })
+    run(async () => {
+      // Deduct from treasury
+      addTransaction({
+        date: new Date().toISOString().slice(0, 10),
+        description: `${expenseForm.type} - ${expenseForm.employee} (${expenseForm.reason})`,
+        type: 'out',
+        category: 'expense',
+        amount: amt,
+        account: expenseForm.account
+      })
 
-    // Add to expense store (real data)
-    expenseStore.addExpense({
-      date: new Date().toISOString().slice(0, 10),
-      employee: expenseForm.employee,
-      category: expenseForm.type === 'سلفة' ? 'أخرى' : (expenseForm.reason || 'أخرى'),
-      description: `${expenseForm.type} - ${expenseForm.employee}: ${expenseForm.reason}`,
-      amount: amt,
-      type: expenseForm.type === 'سلفة' ? 'advance' : 'expense',
-      status: 'approved',
-    })
+      // Add to expense store (real data)
+      expenseStore.addExpense({
+        date: new Date().toISOString().slice(0, 10),
+        employee: expenseForm.employee,
+        category: expenseForm.type === 'سلفة' ? 'أخرى' : (expenseForm.reason || 'أخرى'),
+        description: `${expenseForm.type} - ${expenseForm.employee}: ${expenseForm.reason}`,
+        amount: amt,
+        type: expenseForm.type === 'سلفة' ? 'advance' : 'expense',
+        status: 'approved',
+      })
 
-    toast(`تم تسجيل ال${expenseForm.type} وخصمها من الخزنة`, 'success')
-    setShowNewExpense(false)
-    setExpenseForm({ type: 'سلفة', employee: '', amount: '', reason: '', account: 'cash' })
+      toast(`تم تسجيل ال${expenseForm.type} وخصمها من الخزنة`, 'success')
+      setShowNewExpense(false)
+      setExpenseForm({ type: 'سلفة', employee: '', amount: '', reason: '', account: 'cash' })
+    })
   }
 
   return (
@@ -687,7 +693,7 @@ export default function HRPage() {
       <Modal open={showNewExpense} onClose={() => setShowNewExpense(false)} title="إضافة سلفة أو مصروف" footer={
         <>
           <button className="btn btn-outline" onClick={() => setShowNewExpense(false)}>إلغاء</button>
-          <button className="btn btn-primary" onClick={handleAddExpense}><i className="fa fa-save" /> حفظ واعتماد</button>
+          <button className="btn btn-primary" onClick={handleAddExpense} disabled={saving}><i className="fa fa-save" /> حفظ واعتماد</button>
         </>
       }>
         <div className="form-grid-2">
@@ -737,14 +743,16 @@ export default function HRPage() {
         footer={
           <>
             <button className="btn btn-outline" onClick={() => setShowNew(false)}>إلغاء</button>
-            <button className="btn btn-primary" onClick={() => {
+            <button className="btn btn-primary" disabled={saving} onClick={() => {
               if (!newEmpForm.name || !newEmpForm.position) { toast('يرجى تعبئة الاسم والمسمى الوظيفي', 'danger'); return }
-              const salary = parseFloat(newEmpForm.salary) || 0
-              const allowances = parseFloat(newEmpForm.allowances) || 0
-              addEmployee({ name: newEmpForm.name, position: newEmpForm.position, department: newEmpForm.department, salary, allowances, deductions: 0, netSalary: salary + allowances, phone: newEmpForm.phone, email: newEmpForm.email, joinDate: newEmpForm.joinDate, status: 'active' })
-              toast('تم إضافة الموظف بنجاح', 'success')
-              setShowNew(false)
-              setNewEmpForm({ name: '', position: '', department: DEPARTMENTS[1] ?? '', salary: '', allowances: '', phone: '', email: '', joinDate: new Date().toISOString().slice(0, 10) })
+              run(async () => {
+                const salary = parseFloat(newEmpForm.salary) || 0
+                const allowances = parseFloat(newEmpForm.allowances) || 0
+                addEmployee({ name: newEmpForm.name, position: newEmpForm.position, department: newEmpForm.department, salary, allowances, deductions: 0, netSalary: salary + allowances, phone: newEmpForm.phone, email: newEmpForm.email, joinDate: newEmpForm.joinDate, status: 'active' })
+                toast('تم إضافة الموظف بنجاح', 'success')
+                setShowNew(false)
+                setNewEmpForm({ name: '', position: '', department: DEPARTMENTS[1] ?? '', salary: '', allowances: '', phone: '', email: '', joinDate: new Date().toISOString().slice(0, 10) })
+              })
             }}>حفظ</button>
           </>
         }
@@ -835,22 +843,24 @@ export default function HRPage() {
           <Modal open={!!editEmpId} onClose={() => setEditEmpId(null)} title="تعديل بيانات الموظف"
             footer={<>
               <button className="btn btn-outline" onClick={() => setEditEmpId(null)}>إلغاء</button>
-              <button className="btn btn-primary" onClick={() => {
-                const salary = parseFloat(editEmpForm.salary) || 0
-                const allowances = parseFloat(editEmpForm.allowances) || 0
-                const deductions = parseFloat(editEmpForm.deductions) || 0
-                updateEmployee(emp.id, {
-                  name: editEmpForm.name,
-                  position: editEmpForm.position,
-                  department: editEmpForm.department,
-                  salary, allowances, deductions,
-                  netSalary: salary + allowances - deductions,
-                  phone: editEmpForm.phone,
-                  email: editEmpForm.email,
-                  iqama: editEmpForm.iqama || undefined,
+              <button className="btn btn-primary" disabled={saving} onClick={() => {
+                run(async () => {
+                  const salary = parseFloat(editEmpForm.salary) || 0
+                  const allowances = parseFloat(editEmpForm.allowances) || 0
+                  const deductions = parseFloat(editEmpForm.deductions) || 0
+                  updateEmployee(emp.id, {
+                    name: editEmpForm.name,
+                    position: editEmpForm.position,
+                    department: editEmpForm.department,
+                    salary, allowances, deductions,
+                    netSalary: salary + allowances - deductions,
+                    phone: editEmpForm.phone,
+                    email: editEmpForm.email,
+                    iqama: editEmpForm.iqama || undefined,
+                  })
+                  toast('تم تحديث بيانات الموظف', 'success')
+                  setEditEmpId(null)
                 })
-                toast('تم تحديث بيانات الموظف', 'success')
-                setEditEmpId(null)
               }}><i className="fa fa-save" /> حفظ</button>
             </>}
           >
@@ -949,7 +959,7 @@ export default function HRPage() {
       <Modal open={showNewAsset} onClose={() => setShowNewAsset(false)} title="أصل جديد"
         footer={<>
           <button className="btn btn-outline" onClick={() => setShowNewAsset(false)}>إلغاء</button>
-          <button className="btn btn-primary" onClick={handleAddAsset}><i className="fa fa-save" /> حفظ</button>
+          <button className="btn btn-primary" onClick={handleAddAsset} disabled={saving}><i className="fa fa-save" /> حفظ</button>
         </>}>
         <div className="form-grid-2">
           <div className="form-group col-span-2"><label className="form-label">اسم الأصل *</label><input className="form-control" value={assetForm.name} onChange={e => setAssetForm(f => ({ ...f, name: e.target.value }))} /></div>

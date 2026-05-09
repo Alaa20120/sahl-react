@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { type Product, type Withdrawal, PRODUCTS, WITHDRAWALS } from '@/lib/mock-data/inventory'
 
 interface InventoryStore {
@@ -29,10 +29,8 @@ export const useInventoryStore = create<InventoryStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-        } else {
+        try {
+          const data = await supaFetch('products', { select: '*', limit: 500 })
           const mapped = (data || []).map((p: any): Product => ({
             id: p.id,
             sku: p.sku,
@@ -46,6 +44,8 @@ export const useInventoryStore = create<InventoryStore>()(
             status: p.status || 'active',
           }))
           set({ products: mapped, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
@@ -54,9 +54,10 @@ export const useInventoryStore = create<InventoryStore>()(
         if (!product) return
         const newStock = Math.max(0, product.stock - qty)
         if (isSupabaseConfigured()) {
-          await supabase.from('products').update({ stock: newStock }).eq('id', productId)
-          await supabase.from('stock_movements').insert({
-            product_id: productId, type: 'out', qty, reference: 'manual_deduction',
+          await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + productId, body: { stock: newStock } })
+          await supaFetch('stock_movements', {
+            method: 'POST',
+            body: { product_id: productId, type: 'out', qty, reference: 'manual_deduction' },
           })
         }
         set(state => ({
@@ -69,9 +70,10 @@ export const useInventoryStore = create<InventoryStore>()(
         if (!product) return
         const newStock = product.stock + qty
         if (isSupabaseConfigured()) {
-          await supabase.from('products').update({ stock: newStock }).eq('id', productId)
-          await supabase.from('stock_movements').insert({
-            product_id: productId, type: 'in', qty, reference: reference || 'manual_addition',
+          await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + productId, body: { stock: newStock } })
+          await supaFetch('stock_movements', {
+            method: 'POST',
+            body: { product_id: productId, type: 'in', qty, reference: reference || 'manual_addition' },
           })
         }
         set(state => ({
@@ -80,23 +82,23 @@ export const useInventoryStore = create<InventoryStore>()(
       },
 
       async deductFromInventory(items) {
-        set(state => {
-          let products = [...state.products]
-          for (const item of items) {
-            if (!item.productId) continue
-            const p = products.find(pr => pr.id === item.productId)
-            if (!p) continue
-            const newStock = Math.max(0, p.stock - item.qty)
-            products = products.map(pr => pr.id === item.productId ? { ...pr, stock: newStock } : pr)
-            if (isSupabaseConfigured()) {
-              supabase.from('products').update({ stock: newStock }).eq('id', item.productId)
-              supabase.from('stock_movements').insert({
-                product_id: item.productId, type: 'out', qty: item.qty, reference: 'invoice',
-              })
-            }
+        const current = get().products
+        const updated = [...current]
+        for (const item of items) {
+          if (!item.productId) continue
+          const idx = updated.findIndex(p => p.id === item.productId)
+          if (idx === -1) continue
+          const newStock = Math.max(0, updated[idx].stock - item.qty)
+          updated[idx] = { ...updated[idx], stock: newStock }
+          if (isSupabaseConfigured()) {
+            await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + item.productId, body: { stock: newStock } })
+            await supaFetch('stock_movements', {
+              method: 'POST',
+              body: { product_id: item.productId, type: 'out', qty: item.qty, reference: 'invoice' },
+            })
           }
-          return { products }
-        })
+        }
+        set({ products: updated })
       },
 
       async updateProduct(id, updates) {
@@ -112,8 +114,7 @@ export const useInventoryStore = create<InventoryStore>()(
         if (updates.status !== undefined) dbUpdates.status = updates.status
 
         if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('products').update(dbUpdates).eq('id', id)
-          if (error) throw new Error(error.message)
+          await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + id, body: dbUpdates })
         }
         set(state => ({
           products: state.products.map(p => p.id === id ? { ...p, ...updates } : p),
@@ -123,7 +124,7 @@ export const useInventoryStore = create<InventoryStore>()(
       async deleteProducts(ids) {
         if (isSupabaseConfigured()) {
           for (const id of ids) {
-            await supabase.from('products').delete().eq('id', id)
+            await supaFetch('products', { method: 'DELETE', filter: 'id=eq.' + id })
           }
         }
         set(state => ({
@@ -133,19 +134,23 @@ export const useInventoryStore = create<InventoryStore>()(
 
       async addProduct(product) {
         if (isSupabaseConfigured()) {
-          const { data, error } = await supabase.from('products').insert({
-            id: product.id,
-            sku: product.sku,
-            name: product.name,
-            category: product.category || null,
-            unit: product.unit || 'قطعة',
-            cost_price: product.costPrice || 0,
-            sell_price: product.sellPrice || 0,
-            stock: product.stock || 0,
-            min_stock: product.minStock || 0,
-            status: product.status || 'active',
-          }).select().single()
-          if (error) throw new Error(error.message)
+          const result = await supaFetch('products', {
+            method: 'POST',
+            body: {
+              id: product.id,
+              sku: product.sku,
+              name: product.name,
+              category: product.category || null,
+              unit: product.unit || 'قطعة',
+              cost_price: product.costPrice || 0,
+              sell_price: product.sellPrice || 0,
+              stock: product.stock || 0,
+              min_stock: product.minStock || 0,
+              status: product.status || 'active',
+            },
+          })
+          const data = Array.isArray(result) ? result[0] : result
+          if (!data) throw new Error('Failed to insert product')
           const mapped: Product = {
             id: data.id, sku: data.sku, name: data.name,
             category: data.category || '', unit: data.unit || 'قطعة',

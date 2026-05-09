@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/lib/toast'
 import type { PaymentMethod } from '@/lib/mock-data/invoices'
 
-interface LineItem { id: number; productId?: string; desc: string; qty: string; price: number }
+interface LineItem { id: number; productId?: string; desc: string; qty: string; price: string }
 
 // ── Product picker input ─────────────────────────────────────────────────────
 function ProductPicker({
@@ -134,35 +134,35 @@ export default function InvoiceNewPage() {
   const [dueDate, setDueDate]             = useState('')
   const [hasDueDate, setHasDueDate]       = useState(false)
   const [notes, setNotes]                 = useState('شكراً لتعاملكم معنا. يُرجى الدفع خلال 30 يوماً.')
-  const [items, setItems]                 = useState<LineItem[]>([{ id: 1, desc: '', qty: '1', price: 0 }])
+  const [items, setItems]                 = useState<LineItem[]>([{ id: 1, desc: '', qty: '1', price: '' }])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [saving, setSaving]               = useState(false)
 
   const customer = CUSTOMERS.find(c => c.id === customerId)
   const invoiceNumber = nextNumber()
 
-  const addItem = () => setItems(prev => [...prev, { id: Date.now(), desc: '', qty: '1', price: 0 }])
+  const addItem = () => setItems(prev => [...prev, { id: Date.now(), desc: '', qty: '1', price: '' }])
   const removeItem = (id: number) => setItems(prev => prev.filter(i => i.id !== id))
   const updateItem = (id: number, key: keyof LineItem, val: string | number) =>
     setItems(prev => prev.map(i => i.id === id ? { ...i, [key]: val } : i))
   const selectProduct = (id: number, product: Product) =>
-    setItems(prev => prev.map(i => i.id === id ? { ...i, productId: product.id, desc: product.name, price: product.sellPrice } : i))
+    setItems(prev => prev.map(i => i.id === id ? { ...i, productId: product.id, desc: product.name, price: String(product.sellPrice) } : i))
 
-  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * i.price, 0)
+  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.price) || 0), 0)
   const taxBreakdown = calculateTax(subtotal)
   const tax = taxBreakdown.tax
   const total = taxBreakdown.total
 
-  const handleSave = (asDraft = false) => {
-    const hasEmpty = items.some(i => !i.desc || i.price <= 0)
+  const handleSave = async (asDraft = false) => {
+    const hasEmpty = items.some(i => !i.desc || !(parseFloat(i.price) > 0))
     if (hasEmpty) { toast('يرجى ملء بيانات جميع الأصناف', 'warn'); return }
     if (!customerId) { toast('يرجى اختيار العميل', 'warn'); return }
 
     const status = asDraft ? 'draft' : paymentMethod === 'cash' ? 'paid' : 'pending'
 
     setSaving(true)
-    setTimeout(() => {
-      addInvoice({
+    try {
+      await addInvoice({
         customer: customer!.name,
         customerId,
         date,
@@ -173,11 +173,8 @@ export default function InvoiceNewPage() {
         status,
         paymentMethod,
         createdBy: user?.name,
-        items: items.map(i => ({ description: i.desc, productId: i.productId, qty: parseFloat(i.qty) || 1, price: i.price, total: (parseFloat(i.qty) || 1) * i.price })),
+        items: items.map(i => { const q = parseFloat(i.qty) || 1; const p = parseFloat(i.price) || 0; return { description: i.desc, productId: i.productId, qty: q, price: p, total: q * p } }),
       })
-      if (!asDraft && paymentMethod === 'credit') {
-        updateBalance(customerId, -total) // credit invoice → balance decreases (customer owes us)
-      }
       toast(
         asDraft
           ? `تم حفظ الفاتورة ${invoiceNumber} كمسودة`
@@ -185,7 +182,11 @@ export default function InvoiceNewPage() {
         'success'
       )
       navigate('/erp/invoices')
-    }, 600)
+    } catch (err: any) {
+      toast(`خطأ في حفظ الفاتورة: ${err?.message || 'حاول مرة أخرى'}`, 'danger')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -348,14 +349,11 @@ export default function InvoiceNewPage() {
                     type="text"
                     inputMode="decimal"
                     placeholder="0.00"
-                    value={item.price || ''}
-                    onChange={e => {
-                      const v = e.target.value.replace(/[^0-9.]/g, '')
-                      updateItem(item.id, 'price', v === '' ? 0 : parseFloat(v))
-                    }}
+                    value={item.price}
+                    onChange={e => updateItem(item.id, 'price', e.target.value.replace(/[^0-9.]/g, ''))}
                   />
                   <div style={{ fontWeight: 700, fontSize: 13, padding: '8px 12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', textAlign: 'center' }}>
-                    {fmt((parseFloat(item.qty) || 0) * item.price)}
+                    {fmt((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0))}
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}

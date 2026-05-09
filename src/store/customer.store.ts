@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import type { Customer } from '@/lib/mock-data/customers'
 
 export interface CustomerPayment {
@@ -42,10 +42,8 @@ export const useCustomerStore = create<CustomerStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-        } else {
+        try {
+          const data = await supaFetch('customers', { select: '*', limit: 500 })
           const mapped = (data || []).map((c: any): Customer => ({
             id: c.id,
             name: c.name,
@@ -61,6 +59,8 @@ export const useCustomerStore = create<CustomerStore>()(
             since: c.since,
           }))
           set({ customers: mapped, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
@@ -77,8 +77,9 @@ export const useCustomerStore = create<CustomerStore>()(
           status: data.status || 'active',
         }
         if (isSupabaseConfigured()) {
-          const { data: inserted, error } = await supabase.from('customers').insert(dbRow).select().single()
-          if (error) throw new Error(error.message)
+          const result = await supaFetch('customers', { method: 'POST', body: dbRow })
+          const inserted = Array.isArray(result) ? result[0] : result
+          if (!inserted) throw new Error('Failed to insert customer')
           const newCustomer: Customer = {
             id: inserted.id,
             name: inserted.name,
@@ -116,8 +117,7 @@ export const useCustomerStore = create<CustomerStore>()(
         if (updates.status !== undefined) dbUpdates.status = updates.status
 
         if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('customers').update(dbUpdates).eq('id', id)
-          if (error) throw new Error(error.message)
+          await supaFetch('customers', { method: 'PATCH', filter: 'id=eq.' + id, body: dbUpdates })
         }
         set(state => ({
           customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c),
@@ -126,8 +126,7 @@ export const useCustomerStore = create<CustomerStore>()(
 
       async deleteCustomer(id) {
         if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('customers').delete().eq('id', id)
-          if (error) throw new Error(error.message)
+          await supaFetch('customers', { method: 'DELETE', filter: 'id=eq.' + id })
         }
         set(state => ({ customers: state.customers.filter(c => c.id !== id) }))
       },
@@ -137,7 +136,7 @@ export const useCustomerStore = create<CustomerStore>()(
         if (!customer) return
         const newBalance = customer.balance + delta
         if (isSupabaseConfigured()) {
-          await supabase.from('customers').update({ balance: newBalance }).eq('id', customerId)
+          await supaFetch('customers', { method: 'PATCH', filter: 'id=eq.' + customerId, body: { balance: newBalance } })
         }
         set(state => ({
           customers: state.customers.map(c => c.id === customerId ? { ...c, balance: newBalance } : c),
@@ -149,16 +148,19 @@ export const useCustomerStore = create<CustomerStore>()(
         const refId = `RCP-${Date.now()}`
         const newPayment: CustomerPayment = { ...payment, id, refId }
         if (isSupabaseConfigured()) {
-          await supabase.from('customer_payments').insert({
-            customer_id: payment.customerId,
-            date: payment.date,
-            amount: payment.amount,
-            type: payment.type,
-            method: payment.method,
-            description: payment.description,
-            ref_id: refId,
-            balance_before: payment.balanceBefore,
-            balance_after: payment.balanceAfter,
+          await supaFetch('customer_payments', {
+            method: 'POST',
+            body: {
+              customer_id: payment.customerId,
+              date: payment.date,
+              amount: payment.amount,
+              type: payment.type,
+              method: payment.method,
+              description: payment.description,
+              ref_id: refId,
+              balance_before: payment.balanceBefore,
+              balance_after: payment.balanceAfter,
+            },
           })
         }
         set(state => ({

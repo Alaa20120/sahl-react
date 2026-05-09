@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { INVOICES, type Invoice, type InvoiceStatus, getNextInvoiceNumber, generateBarcode } from '@/lib/mock-data/invoices'
 import { useInventoryStore } from './inventory.store'
 import { useCustomerStore } from './customer.store'
+import { useTreasuryStore } from './treasury.store'
 
 interface InvoiceStore {
   invoices: Invoice[]
@@ -35,11 +36,18 @@ export const useInvoiceStore = create<InvoiceStore>()(
       async fetch() {
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
-        const { data, error } = await supabase.from('invoices').select('*, invoice_items(*)').order('created_at', { ascending: false })
-        if (error) {
-          set({ error: error.message, loading: false })
-        } else {
-          const mapped = (data || []).map((inv: any): Invoice => ({
+        try {
+          // Fetch invoices and their items in two calls, then join client-side
+          const [invoicesData, itemsData] = await Promise.all([
+            supaFetch('invoices', { select: '*', limit: 500 }),
+            supaFetch('invoice_items', { select: '*', limit: 2000 }),
+          ])
+          const itemsByInvoice: Record<string, any[]> = {}
+          for (const it of (itemsData || [])) {
+            if (!itemsByInvoice[it.invoice_id]) itemsByInvoice[it.invoice_id] = []
+            itemsByInvoice[it.invoice_id].push(it)
+          }
+          const mapped = (invoicesData || []).map((inv: any): Invoice => ({
             id: inv.id,
             number: inv.number,
             barcode: inv.barcode || undefined,
@@ -53,7 +61,7 @@ export const useInvoiceStore = create<InvoiceStore>()(
             paidAmount: Number(inv.paid_amount) || 0,
             status: inv.status,
             paymentMethod: inv.payment_method || undefined,
-            items: (inv.invoice_items || []).map((it: any) => ({
+            items: (itemsByInvoice[inv.id] || []).map((it: any) => ({
               description: it.description,
               productId: it.product_id || undefined,
               qty: it.qty,
@@ -64,6 +72,8 @@ export const useInvoiceStore = create<InvoiceStore>()(
             attachments: [],
           }))
           set({ invoices: mapped, loading: false })
+        } catch (e: any) {
+          set({ error: e.message, loading: false })
         }
       },
 
@@ -87,34 +97,39 @@ export const useInvoiceStore = create<InvoiceStore>()(
         }
 
         if (isSupabaseConfigured()) {
-          const { data: inserted, error } = await supabase.from('invoices').insert({
-            number,
-            barcode,
-            customer: data.customer,
-            customer_id: data.customerId || null,
-            date: data.date,
-            due_date: data.dueDate || null,
-            amount: data.amount,
-            tax: data.tax,
-            total: data.total,
-            paid_amount: data.paidAmount || 0,
-            status: data.status,
-            payment_method: data.paymentMethod || null,
-            created_by: data.createdBy || null,
-          }).select().single()
-          if (error) throw new Error(error.message)
+          const result = await supaFetch('invoices', {
+            method: 'POST',
+            body: {
+              number,
+              barcode,
+              customer: data.customer,
+              customer_id: data.customerId || null,
+              date: data.date,
+              due_date: data.dueDate || null,
+              amount: data.amount,
+              tax: data.tax,
+              total: data.total,
+              paid_amount: data.paidAmount || 0,
+              status: data.status,
+              payment_method: data.paymentMethod || null,
+              created_by: data.createdBy || null,
+            },
+          })
+          const inserted = Array.isArray(result) ? result[0] : result
+          if (!inserted) throw new Error('Failed to insert invoice')
 
           if (data.items.length > 0) {
-            await supabase.from('invoice_items').insert(
-              data.items.map(it => ({
+            await supaFetch('invoice_items', {
+              method: 'POST',
+              body: data.items.map(it => ({
                 invoice_id: inserted.id,
                 description: it.description,
                 product_id: it.productId || null,
                 qty: it.qty,
                 price: it.price,
                 total: it.total,
-              }))
-            )
+              })),
+            })
           }
           invoice.id = inserted.id
           for (const item of data.items) {
@@ -125,6 +140,18 @@ export const useInvoiceStore = create<InvoiceStore>()(
           if (data.customerId) {
             await useCustomerStore.getState().updateBalance(data.customerId, data.total)
           }
+          // Treasury: record cash payment immediately if paid in full
+          if (data.paymentMethod === 'cash' && (data.paidAmount || 0) >= data.total) {
+            await useTreasuryStore.getState().addTransaction({
+              date: data.date,
+              description: `فاتورة مبيعات ${number} - ${data.customer}`,
+              type: 'in',
+              category: 'invoice',
+              amount: data.total,
+              account: 'cash',
+              ref: number,
+            })
+          }
         }
 
         set(state => ({ invoices: [invoice, ...state.invoices], globalCounter: newCounter }))
@@ -132,7 +159,9 @@ export const useInvoiceStore = create<InvoiceStore>()(
       },
 
       async updateStatus(id, status) {
-        if (isSupabaseConfigured()) await supabase.from('invoices').update({ status }).eq('id', id)
+        if (isSupabaseConfigured()) {
+          await supaFetch('invoices', { method: 'PATCH', filter: 'id=eq.' + id, body: { status } })
+        }
         set(state => ({ invoices: state.invoices.map(inv => inv.id === id ? { ...inv, status } : inv) }))
       },
 
@@ -145,19 +174,28 @@ export const useInvoiceStore = create<InvoiceStore>()(
         else if (newPaid > 0) newStatus = 'partial'
 
         if (isSupabaseConfigured()) {
-          await supabase.from('invoices').update({ paid_amount: newPaid, status: newStatus }).eq('id', id)
-          await supabase.from('treasury_transactions').insert({
-            date: new Date().toISOString().slice(0, 10),
-            description: `دفعة فاتورة ${invoice.number}`,
-            type: 'in', category: 'collection', amount,
-            balance: amount, account_id: 'cash', ref: invoice.number,
+          await supaFetch('invoices', {
+            method: 'PATCH',
+            filter: 'id=eq.' + id,
+            body: { paid_amount: newPaid, status: newStatus },
+          })
+          await supaFetch('treasury_transactions', {
+            method: 'POST',
+            body: {
+              date: new Date().toISOString().slice(0, 10),
+              description: `دفعة فاتورة ${invoice.number}`,
+              type: 'in', category: 'collection', amount,
+              balance: amount, account_id: 'cash', ref: invoice.number,
+            },
           })
         }
         set(state => ({ invoices: state.invoices.map(inv => inv.id === id ? { ...inv, paidAmount: newPaid, status: newStatus } : inv) }))
       },
 
       async confirmInvoice(id) {
-        if (isSupabaseConfigured()) await supabase.from('invoices').update({ status: 'confirmed' }).eq('id', id)
+        if (isSupabaseConfigured()) {
+          await supaFetch('invoices', { method: 'PATCH', filter: 'id=eq.' + id, body: { status: 'confirmed' } })
+        }
         set(state => ({ invoices: state.invoices.map(inv => inv.id === id ? { ...inv, status: 'confirmed' as InvoiceStatus } : inv) }))
       },
 
@@ -196,26 +234,43 @@ export const useInvoiceStore = create<InvoiceStore>()(
         }
 
         if (isSupabaseConfigured()) {
-          const { data: inserted } = await supabase.from('invoices').insert({
-            number: returnNumber, barcode: returnInvoice.barcode,
-            customer: original.customer, customer_id: original.customerId || null,
-            date: returnInvoice.date, amount: returnAmount, tax: returnTax,
-            total: returnTotal, paid_amount: returnTotal, status: 'returned',
-            payment_method: original.paymentMethod || null,
-            is_return: true, original_invoice_id: originalInvoiceId, return_reason: reason,
-          }).select().single()
+          const result = await supaFetch('invoices', {
+            method: 'POST',
+            body: {
+              number: returnNumber, barcode: returnInvoice.barcode,
+              customer: original.customer, customer_id: original.customerId || null,
+              date: returnInvoice.date, amount: returnAmount, tax: returnTax,
+              total: returnTotal, paid_amount: returnTotal, status: 'returned',
+              payment_method: original.paymentMethod || null,
+              is_return: true, original_invoice_id: originalInvoiceId, return_reason: reason,
+            },
+          })
+          const inserted = Array.isArray(result) ? result[0] : result
 
           if (inserted) {
             returnInvoice.id = inserted.id
-            await supabase.from('invoice_items').insert(returnedItems.map(it => ({
-              invoice_id: inserted.id, description: it.description,
-              product_id: it.productId || null, qty: it.qty, price: it.price, total: it.total,
-            })))
+            await supaFetch('invoice_items', {
+              method: 'POST',
+              body: returnedItems.map(it => ({
+                invoice_id: inserted.id, description: it.description,
+                product_id: it.productId || null, qty: it.qty, price: it.price, total: it.total,
+              })),
+            })
           }
           for (const item of returnedItems) {
             if (item.productId) await useInventoryStore.getState().addStock(item.productId, item.qty, `return_${returnNumber}`)
           }
           if (original.customerId) await useCustomerStore.getState().updateBalance(original.customerId, -returnTotal)
+          // Treasury: record refund as outgoing
+          await useTreasuryStore.getState().addTransaction({
+            date: returnInvoice.date,
+            description: `مرتجع فاتورة ${original.number} - ${original.customer}`,
+            type: 'out',
+            category: 'invoice',
+            amount: returnTotal,
+            account: 'cash',
+            ref: returnNumber,
+          })
         }
 
         set(state => ({ invoices: [returnInvoice, ...state.invoices] }))

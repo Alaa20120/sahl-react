@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
+import { useAppStore } from '@/store/app.store'
+import { supabase } from '@/lib/supabase'
 import { toast } from '@/lib/toast'
 
 const PLANS = [
@@ -13,6 +15,8 @@ export default function Register() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [plan, setPlan] = useState('pro')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [emailSent, setEmailSent] = useState(false)
   const [form, setForm] = useState({
     companyName: '', companyNameEn: '', cr: '', vat: '',
     city: 'الرياض', industry: '',
@@ -36,14 +40,101 @@ export default function Register() {
     setStep(prev => (prev < 3 ? (prev + 1) as 1 | 2 | 3 : prev))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => {
-      login({ id: '1', name: form.name, email: form.email, role: 'admin', company: form.companyName })
-      toast('تم إنشاء الحساب بنجاح! مرحباً بك في سهل', 'success')
-      navigate('/erp/dashboard')
-    }, 1200)
+    setErrorMsg('')
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: { data: { name: form.name, role: 'admin' } },
+      })
+
+      if (error) {
+        const raw = error.message || ''
+        if (raw.includes('already registered') || raw.includes('already been registered') || raw.includes('User already'))
+          setErrorMsg('هذا البريد الإلكتروني مسجل مسبقاً — سجّل الدخول بدلاً من ذلك')
+        else if (raw.includes('Password') || raw.includes('password'))
+          setErrorMsg('كلمة المرور ضعيفة — استخدم 6 أحرف على الأقل')
+        else if (raw.includes('valid email') || raw.includes('email'))
+          setErrorMsg('البريد الإلكتروني غير صالح')
+        else if (raw.includes('network') || raw.includes('fetch'))
+          setErrorMsg('تعذر الاتصال بالخادم — تحقق من الإنترنت')
+        else
+          setErrorMsg(`خطأ: ${raw}`)
+        setLoading(false)
+        return
+      }
+
+      // Email confirmation required
+      if (!data.session) {
+        setEmailSent(true)
+        setLoading(false)
+        return
+      }
+
+      // Logged in immediately — save profile
+      if (data.user) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          name: form.name,
+          email: form.email,
+          role: 'admin',
+        })
+        // Save company data from registration to app store
+        useAppStore.getState().updateCompany({
+          name: form.companyName,
+          nameEn: form.companyNameEn,
+          cr: form.cr,
+          vat: form.vat,
+          city: form.city,
+        })
+        login({
+          id: data.user.id,
+          name: form.name,
+          email: form.email,
+          role: 'admin',
+          company: form.companyName,
+        })
+        toast('مرحباً بك في سهل! تم إنشاء حسابك بنجاح', 'success')
+        navigate('/erp/dashboard')
+      }
+    } catch (err: any) {
+      setErrorMsg(`خطأ غير متوقع: ${err?.message || 'تحقق من الاتصال بالإنترنت'}`)
+    }
+    setLoading(false)
+  }
+
+  // Email confirmation screen
+  if (emailSent) {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-form-side" style={{ maxWidth: 480, textAlign: 'center' }}>
+          <div style={{ fontSize: 64, marginBottom: 24 }}>📧</div>
+          <div className="auth-title">تحقق من بريدك الإلكتروني</div>
+          <div className="auth-sub" style={{ marginBottom: 24 }}>
+            أرسلنا رابط التأكيد إلى <strong>{form.email}</strong>
+            <br />افتح الإيميل واضغط على الرابط ثم سجّل الدخول
+          </div>
+          <div style={{ background: '#FFF3CD', border: '1px solid #FFC107', borderRadius: 10, padding: '14px 18px', marginBottom: 24, fontSize: 13, color: '#856404', textAlign: 'right' }}>
+            <i className="fa fa-lightbulb" style={{ marginLeft: 8 }} />
+            <strong>لتسجيل الدخول فوراً بدون تأكيد إيميل:</strong>
+            <br />Supabase Dashboard ← Authentication ← Providers ← Email ← أوقف "Confirm email"
+          </div>
+          <Link to="/" className="btn btn-primary" style={{ justifyContent: 'center', width: '100%' }}>
+            الذهاب لتسجيل الدخول
+          </Link>
+        </div>
+        <div className="auth-hero-side">
+          <div className="auth-hero-content">
+            <div className="auth-hero-title">تحقق من بريدك</div>
+            <div className="auth-hero-sub">بعد تأكيد الإيميل ستتمكن من الدخول مباشرة</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -193,6 +284,14 @@ export default function Register() {
                 ))}
               </div>
             </>
+          )}
+
+          {/* Error box */}
+          {errorMsg && (
+            <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: 'var(--danger)', fontSize: 13, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <i className="fa fa-exclamation-circle" style={{ marginTop: 2, flexShrink: 0 }} />
+              <span>{errorMsg}</span>
+            </div>
           )}
 
           {/* Navigation */}

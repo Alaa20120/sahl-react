@@ -2,29 +2,26 @@ import { useState } from 'react'
 import PageHeader from '@/components/ui/PageHeader'
 import Card from '@/components/ui/Card'
 import { toast } from '@/lib/toast'
+import { useAppStore } from '@/store/app.store'
 
 const TABS = ['الشركة', 'الفواتير', 'الضريبة', 'الإشعارات', 'النسخ الاحتياطي']
 
 export default function SettingsPage() {
+  const storeCompany = useAppStore(s => s.company)
+  const updateCompany = useAppStore(s => s.updateCompany)
+  const storeNotes = useAppStore(s => s.invoiceNotes)
+  const setInvoiceNotes = useAppStore(s => s.setInvoiceNotes)
+
   const [tab, setTab] = useState('الشركة')
-  const [logo, setLogo] = useState<string | null>(null)
-  const [company, setCompany] = useState({
-    name: 'شركة سهل التقنية',
-    nameEn: 'Sahl Technology Co.',
-    cr: '1234567890',
-    vat: '310123456700003',
-    phone: '0112345678',
-    email: 'info@sahl.sa',
-    address: 'الرياض، حي العليا، شارع التحلية',
-    city: 'الرياض',
-    country: 'المملكة العربية السعودية',
-  })
+  const [logo, setLogo] = useState<string | null>(storeCompany.logo)
+  const [company, setCompany] = useState({ ...storeCompany })
+  const [invoiceNotes, setLocalNotes] = useState(storeNotes)
   const [invoice, setInvoice] = useState({
     prefix: 'INV',
-    nextNum: 9,
+    nextNum: 1,
     payDays: 30,
     currency: 'SAR',
-    notes: 'شكراً لتعاملكم معنا. يُرجى الدفع خلال 30 يوماً من تاريخ الفاتورة.',
+    notes: storeNotes,
     terms: '',
   })
   const [notifs, setNotifs] = useState({
@@ -36,7 +33,11 @@ export default function SettingsPage() {
     smsNotifs: false,
   })
 
-  const handleSave = () => toast('تم حفظ الإعدادات بنجاح', 'success')
+  const handleSave = () => {
+    updateCompany({ ...company, logo })
+    setInvoiceNotes(invoiceNotes)
+    toast('تم حفظ الإعدادات بنجاح ✅', 'success')
+  }
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
     <button

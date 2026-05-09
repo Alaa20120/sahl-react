@@ -70,6 +70,10 @@ export default function DelegatePage() {
   const totalPurchases = delegateInvoices.filter((i: any) => i.type === 'purchase').reduce((s: number, i: any) => s + i.total, 0)
   const pendingCount = delegateInvoices.filter((i: any) => i.status === 'pending').length
   const whTotal = delegateWarehouse.reduce((s: number, w: any) => s + (w.qty * w.costPrice), 0)
+  // الآجل الخارجي = فواتير بيع آجلة غير مدفوعة بالكامل
+  const externalCredit = delegateInvoices
+    .filter((i: any) => i.type === 'sale' && i.paymentMethod === 'credit' && i.status !== 'paid')
+    .reduce((s: number, i: any) => s + (i.total - (i.paidAmount ?? 0)), 0)
 
   const parties = newInvType === 'sale'
     ? customers.filter((c: any) => c.type === 'customer' || c.type === 'both')
@@ -267,8 +271,8 @@ export default function DelegatePage() {
       <div className="stats-grid mb-6">
         <StatCard label="مبيعاتي" value={fmt(totalSales)} badge="▲" badgeType="success" dark icon="fa-dollar-sign" />
         <StatCard label="مشترياتي" value={fmt(totalPurchases)} icon="fa-shopping-cart" iconColor="var(--blue)" />
-        <StatCard label="العهدة المالية" value={fmt(totalSales - totalPurchases)} icon="fa-balance-scale" iconColor="var(--primary)" />
-        <StatCard label="فواتير معلقة" value={String(pendingCount)} badge={pendingCount > 0 ? '!' : '✓'} badgeType={pendingCount > 0 ? 'warn' : 'success'} icon="fa-clock" iconColor="var(--warn)" />
+        <StatCard label="الآجل الخارجي" value={fmt(externalCredit)} badge={externalCredit > 0 ? '!' : '✓'} badgeType={externalCredit > 0 ? 'warn' : 'success'} icon="fa-clock" iconColor="var(--warn)" />
+        <StatCard label="فواتير معلقة" value={String(pendingCount)} badge={pendingCount > 0 ? '!' : '✓'} badgeType={pendingCount > 0 ? 'warn' : 'success'} icon="fa-clock" iconColor="var(--danger)" />
         <StatCard label="قيمة المستودع" value={fmt(whTotal)} icon="fa-warehouse" iconColor="var(--success)" />
       </div>
 

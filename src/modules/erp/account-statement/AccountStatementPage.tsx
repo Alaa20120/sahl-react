@@ -47,8 +47,7 @@ export default function AccountStatementPage() {
       }
     } else {
       const beforePurchases = purchases.filter(p => {
-        const matchVendor = (p as any).vendor?.toLowerCase().includes(customer?.name.toLowerCase() ?? '') ||
-          (p as any).vendorId === customerId
+        const matchVendor = p.supplier?.toLowerCase().includes(customer?.name.toLowerCase() ?? '')
         return matchVendor && p.date < from
       })
       for (const po of beforePurchases) {
@@ -74,8 +73,7 @@ export default function AccountStatementPage() {
       // For suppliers: purchases from them
       const supplierPurchases = purchases
         .filter(p => {
-          const matchVendor = (p as any).vendor?.toLowerCase().includes(customer?.name.toLowerCase() ?? '') ||
-            (p as any).vendorId === customerId
+          const matchVendor = p.supplier?.toLowerCase().includes(customer?.name.toLowerCase() ?? '')
           return matchVendor && p.date >= from && p.date <= to
         })
         .sort((a, b) => a.date.localeCompare(b.date))

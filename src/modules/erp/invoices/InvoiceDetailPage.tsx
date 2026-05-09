@@ -6,6 +6,7 @@ import { fmt, fmtDate } from '@/lib/format'
 import { type Invoice, type InvoiceStatus } from '@/lib/mock-data/invoices'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { useInventoryStore } from '@/store/inventory.store'
+import { useCustomerStore } from '@/store/customer.store'
 import { useAppStore } from '@/store/app.store'
 import { toast } from '@/lib/toast'
 
@@ -206,6 +207,7 @@ export default function InvoiceDetailPage() {
   const navigate = useNavigate()
   const { invoices, addPayment, updateStatus, confirmInvoice } = useInvoiceStore()
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
+  const { updateBalance: updateCustomerBalance } = useCustomerStore()
   const co = useAppStore(s => s.company)
   const invoice = invoices.find(i => i.id === id)
 
@@ -235,14 +237,19 @@ export default function InvoiceDetailPage() {
   const handlePrint = () => openPrintWindow(invoice, status, tpl, isVoided, co)
   const handlePDF   = () => { toast('جارٍ تحضير PDF...', 'info'); setTimeout(() => openPrintWindow(invoice, status, tpl, isVoided, co), 200) }
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!payAmount) { toast('يرجى إدخال المبلغ', 'warn'); return }
     const amt = parseFloat(payAmount)
     if (amt > (invoice.total - (invoice.paidAmount || 0))) {
       toast('المبلغ المدفوع أكبر من المتبقي!', 'warn'); return
     }
-    addPayment(invoice.id, amt)
-    toast(`تم تسجيل دفعة ${fmt(amt)} بنجاح`, 'success')
+    // Record payment (includes treasury transaction internally)
+    await addPayment(invoice.id, amt)
+    // Update customer balance — payment received reduces what they owe
+    if (invoice.customerId) {
+      await updateCustomerBalance(invoice.customerId, -amt)
+    }
+    toast(`تم تسجيل دفعة ${fmt(amt)} وتحديث رصيد العميل والخزينة ✅`, 'success')
     setShowPayment(false); setPayAmount('')
   }
 

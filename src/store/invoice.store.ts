@@ -84,8 +84,21 @@ export const useInvoiceStore = create<InvoiceStore>()(
       },
 
       async addInvoice(data) {
-        const newCounter = get().globalCounter + 1
-        const number = getNextInvoiceNumber()
+        const year = new Date().getFullYear()
+        const prefix = `INV-${year}-`
+        // Get real max invoice number from Supabase
+        let seq = get().globalCounter + 1
+        try {
+          const rows = await supaFetch('invoices', { select: 'number', limit: 1000 })
+          if (Array.isArray(rows) && rows.length > 0) {
+            const max = rows
+              .map((r: any) => parseInt((r.number || '').replace(prefix, '').split('-')[0]) || 0)
+              .reduce((a: number, b: number) => Math.max(a, b), 0)
+            seq = max + 1
+          }
+        } catch { /* use local counter */ }
+        const newCounter = seq
+        const number = `${prefix}${String(seq).padStart(4, '0')}`
         const barcode = generateBarcode(number)
 
         const invoice: Invoice = {

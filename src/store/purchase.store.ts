@@ -76,11 +76,24 @@ export const usePurchaseStore = create<PurchaseStore>()(
       async addPurchase(data) {
         const year = new Date().getFullYear()
         const counters = { ...get().yearCounters }
-        // Use timestamp suffix to guarantee uniqueness — never duplicates
-        const ts = Date.now().toString().slice(-5)
-        const n = (counters[year] ?? 0) + 1
+        const prefix = `PO-${year}-`
+
+        // Always get the real max number from Supabase to avoid duplicates
+        let n = 1
+        try {
+          const rows = await supaFetch('purchases', { select: 'number', limit: 500 })
+          if (Array.isArray(rows) && rows.length > 0) {
+            const max = rows
+              .map((r: any) => parseInt((r.number || '').replace(prefix, '').split('-')[0]) || 0)
+              .reduce((a: number, b: number) => Math.max(a, b), 0)
+            n = max + 1
+          }
+        } catch {
+          n = (counters[year] ?? 0) + 1
+        }
+
         counters[year] = n
-        const purchase: Purchase = { ...data, id: `PO-${year}-${String(n).padStart(3,'0')}-${ts}` }
+        const purchase: Purchase = { ...data, id: `${prefix}${String(n).padStart(3,'0')}` }
 
         if (isSupabaseConfigured()) {
           const result = await supaFetch('purchases', {

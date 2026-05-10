@@ -37,11 +37,20 @@ function openPrintWindow(title: string, html: string) {
   win.document.close()
 }
 
-export function printStockReceipt(delegateName: string, productName: string, qty: number, unit: string, costValue: number) {
+export interface CompanyInfo {
+  name: string
+  vat: string
+  phone: string
+  email: string
+  address: string
+  cr?: string
+}
+
+export function printStockReceipt(company: CompanyInfo, delegateName: string, productName: string, qty: number, unit: string, costValue: number) {
   const dateStr = new Date().toLocaleString('ar-SA')
   openPrintWindow('إيصال استلام عهدة', `
     <div class="header">
-      <div><div class="title">إيصال استلام عهدة / مخزون</div><div class="meta">شركة سهل التقنية</div></div>
+      <div><div class="title">إيصال استلام عهدة / مخزون</div><div class="meta">${company.name || '—'}</div></div>
       <div style="text-align: left"><div>التاريخ: ${dateStr}</div><div>اسم المندوب: <strong>${delegateName}</strong></div></div>
     </div>
     <p>أقر أنا المندوب المذكور أعلاه باستلام المواد والكميات الموضحة أدناه لتكون في عهدتي بغرض المبيعات، وأتعهد بالمحافظة عليها وتسديد قيمتها عند البيع:</p>
@@ -51,12 +60,12 @@ export function printStockReceipt(delegateName: string, productName: string, qty
   `)
 }
 
-export function printFinancialReceipt(type: 'in' | 'out', amount: number, desc: string, accountName: string, category: string, refId: string) {
+export function printFinancialReceipt(company: CompanyInfo, type: 'in' | 'out', amount: number, desc: string, accountName: string, category: string, refId: string) {
   const dateStr = new Date().toLocaleString('ar-SA')
   const title = type === 'in' ? 'سند قبض' : 'سند صرف'
   openPrintWindow(`${title} - ${refId}`, `
     <div class="header">
-      <div><div class="title">${title}</div><div class="meta">شركة سهل التقنية</div></div>
+      <div><div class="title">${title}</div><div class="meta">${company.name || '—'}</div></div>
       <div style="text-align: left"><div>التاريخ: ${dateStr}</div><div>رقم السند: <strong>${refId}</strong></div></div>
     </div>
     <div class="amount-box"><div class="label">المبلغ</div><div class="value">${fmt(amount)}</div></div>
@@ -71,6 +80,7 @@ export function printFinancialReceipt(type: 'in' | 'out', amount: number, desc: 
 
 /** إيصال دفعة من عميل أو مورد */
 export function printPaymentReceipt(
+  company: CompanyInfo,
   payerName: string,
   amount: number,
   paymentType: 'collection' | 'payment',
@@ -86,7 +96,7 @@ export function printPaymentReceipt(
 
   openPrintWindow(`${title} - ${refId}`, `
     <div class="header">
-      <div><div class="title">${title}</div><div class="meta">شركة سهل التقنية</div></div>
+      <div><div class="title">${title}</div><div class="meta">${company.name || '—'}</div></div>
       <div style="text-align: left"><div>التاريخ: ${dateStr}</div><div>رقم الإيصال: <strong>${refId}</strong></div></div>
     </div>
     <div style="text-align: center; margin: 20px 0; padding: 20px; background: #f8f9ff; border-radius: 12px;">
@@ -109,6 +119,7 @@ export function printPaymentReceipt(
 
 /** إيصال سحب فلوس من مندوب */
 export function printDelegateWithdrawalReceipt(
+  company: CompanyInfo,
   delegateName: string,
   amount: number,
   description: string,
@@ -119,7 +130,7 @@ export function printDelegateWithdrawalReceipt(
   const dateStr = new Date().toLocaleString('ar-SA')
   openPrintWindow(`إيصال سحب من مندوب - ${refId}`, `
     <div class="header">
-      <div><div class="title">إيصال سحب مبلغ من مندوب</div><div class="meta">شركة سهل التقنية</div></div>
+      <div><div class="title">إيصال سحب مبلغ من مندوب</div><div class="meta">${company.name || '—'}</div></div>
       <div style="text-align: left"><div>التاريخ: ${dateStr}</div><div>رقم الإيصال: <strong>${refId}</strong></div></div>
     </div>
     <div style="text-align: center; margin: 20px 0; padding: 20px; background: #f8f9ff; border-radius: 12px;">
@@ -141,6 +152,7 @@ export function printDelegateWithdrawalReceipt(
 
 /** طباعة كشف حساب */
 export function printAccountStatement(
+  company: CompanyInfo,
   name: string,
   items: { date: string; desc: string; debit: number; credit: number; balance: number; ref: string }[],
   fromDate: string,
@@ -193,7 +205,7 @@ export function printAccountStatement(
 
   openPrintWindow(`كشف حساب - ${name}`, `
     <div class="header">
-      <div><div class="title">كشف حساب</div><div class="meta">شركة سهل التقنية</div></div>
+      <div><div class="title">كشف حساب</div><div class="meta">${company.name || '—'}</div></div>
       <div style="text-align: left"><div>التاريخ: ${dateStr}</div><div>من: ${fromDate} — إلى: ${toDate}</div></div>
     </div>
     <div style="text-align: center; margin: 16px 0; padding: 16px; background: #f8f9ff; border-radius: 8px;">
@@ -216,7 +228,7 @@ export function printAccountStatement(
 }
 
 /** قسيمة راتب موظف */
-export function printPayslip(emp: {
+export function printPayslip(company: CompanyInfo, emp: {
   id: string; name: string; position: string; department: string;
   salary: number; allowances: number; deductions: number; netSalary: number;
   phone?: string; email?: string; iqama?: string; joinDate?: string;
@@ -240,8 +252,8 @@ export function printPayslip(emp: {
     <div class="payslip">
       <div class="ps-header">
         <div>
-          <div style="font-size:18px;font-weight:800">شركة سهل التقنية</div>
-          <div style="font-size:11px;opacity:.7;margin-top:4px">الرقم الضريبي: 310123456700003</div>
+          <div style="font-size:18px;font-weight:800">${company.name || '—'}</div>
+          <div style="font-size:11px;opacity:.7;margin-top:4px">الرقم الضريبي: ${company.vat || '—'}</div>
         </div>
         <div style="text-align:left">
           <div style="font-size:16px;font-weight:800">قسيمة الراتب</div>

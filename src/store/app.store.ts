@@ -33,14 +33,14 @@ interface AppState {
 }
 
 const DEFAULT_COMPANY: CompanyInfo = {
-  name: '',
-  nameEn: '',
+  name: 'شركتي',
+  nameEn: 'My Company',
   cr: '',
   vat: '',
   phone: '',
   email: '',
   address: '',
-  city: 'الرياض',
+  city: '',
   country: 'المملكة العربية السعودية',
   logo: null,
 }
@@ -54,12 +54,15 @@ export const useAppStore = create<AppState>()(
       branch: 'الرئيسي',
       fiscalYearStart: '01-01',
       invoiceNotes: 'شكراً لتعاملكم معنا. يُرجى الدفع خلال 30 يوماً من تاريخ الفاتورة.',
-      companyName: '',
+      companyName: 'شركتي',
 
-      updateCompany: (data) => set(state => ({
-        company: { ...state.company, ...data },
-        companyName: data.name ?? state.company.name,
-      })),
+      updateCompany: (data) => set(state => {
+        const newCompany = { ...state.company, ...data }
+        return {
+          company: newCompany,
+          companyName: newCompany.name,
+        }
+      }),
       setCurrency: (currency) => set({ currency }),
       setVatRate: (vatRate) => set({ vatRate }),
       setBranch: (branch) => set({ branch }),

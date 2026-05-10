@@ -1,137 +1,141 @@
 import { useState } from 'react'
 import PageHeader from '@/components/ui/PageHeader'
+import { useAppStore } from '@/store/app.store'
 import { toast } from '@/lib/toast'
 
 type TemplateId = 'classic' | 'modern' | 'clean'
 const TEMPLATE_KEY = 'sahl-inv-template'
 
-const TEMPLATES: { id: TemplateId; name: string; desc: string; accent: string; preview: React.ReactNode }[] = [
-  {
-    id: 'classic',
-    name: 'كلاسيكي',
-    desc: 'خلفية داكنة في الرأس، احترافي ورسمي',
-    accent: '#0D1117',
-    preview: (
-      <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
-        <div style={{ background: '#0D1117', padding: '16px 20px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 13 }}>شركة سهل التقنية</div>
-            <div style={{ fontSize: 10, opacity: .6, marginTop: 2 }}>الرياض — الرقم الضريبي: 310...0003</div>
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 15, fontWeight: 800, opacity: .9 }}>فاتورة ضريبية</div>
-            <div style={{ fontSize: 10, opacity: .6 }}>INV-2025-009</div>
-          </div>
-        </div>
-        <div style={{ padding: '12px 20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10, fontSize: 10, color: '#6B7280' }}>
-            <div><div style={{ fontWeight: 700 }}>فاتورة إلى</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>شركة الرياض للتجارة</div></div>
-            <div><div style={{ fontWeight: 700 }}>تاريخ الاستحقاق</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>30 مايو 2025</div></div>
-          </div>
-          <div style={{ background: '#F4F6FA', borderRadius: 4, padding: '6px 8px', fontSize: 10, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontWeight: 700, color: '#6B7280' }}>الوصف</span>
-            <span style={{ fontWeight: 700, color: '#6B7280' }}>الإجمالي</span>
-          </div>
-          <div style={{ fontSize: 10, display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #E5E7EB' }}>
-            <span>استشارات تقنية × 5</span><span style={{ fontWeight: 700 }}>12,500</span>
-          </div>
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ fontSize: 10, width: 130 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B7280' }}><span>قبل الضريبة</span><span>12,500</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#F59E0B' }}><span>ضريبة 15%</span><span>1,875</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 12, marginTop: 4, paddingTop: 4, borderTop: '1px solid #E5E7EB' }}><span>الإجمالي</span><span>14,375</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 'modern',
-    name: 'عصري',
-    desc: 'تدرج لوني أزرق، تصميم معاصر وجذاب',
-    accent: '#2563EB',
-    preview: (
-      <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
-        <div style={{ background: 'linear-gradient(135deg,#1a2035,#2563EB)', padding: '16px 20px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 13 }}>شركة سهل التقنية</div>
-            <div style={{ fontSize: 10, opacity: .6, marginTop: 2 }}>الرياض — الرقم الضريبي: 310...0003</div>
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 15, fontWeight: 800, opacity: .9 }}>فاتورة ضريبية</div>
-            <div style={{ fontSize: 10, opacity: .6 }}>INV-2025-009</div>
-          </div>
-        </div>
-        <div style={{ padding: '12px 20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10, fontSize: 10, color: '#6B7280' }}>
-            <div><div style={{ fontWeight: 700 }}>فاتورة إلى</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>شركة الرياض للتجارة</div></div>
-            <div><div style={{ fontWeight: 700 }}>تاريخ الاستحقاق</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>30 مايو 2025</div></div>
-          </div>
-          <div style={{ background: '#EFF6FF', borderRadius: 4, padding: '6px 8px', fontSize: 10, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontWeight: 700, color: '#2563EB' }}>الوصف</span>
-            <span style={{ fontWeight: 700, color: '#2563EB' }}>الإجمالي</span>
-          </div>
-          <div style={{ fontSize: 10, display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #E5E7EB' }}>
-            <span>استشارات تقنية × 5</span><span style={{ fontWeight: 700 }}>12,500</span>
-          </div>
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ fontSize: 10, width: 130 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B7280' }}><span>قبل الضريبة</span><span>12,500</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#F59E0B' }}><span>ضريبة 15%</span><span>1,875</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 12, color: '#2563EB', marginTop: 4, paddingTop: 4, borderTop: '2px solid #2563EB' }}><span>الإجمالي</span><span>14,375</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 'clean',
-    name: 'نظيف',
-    desc: 'أبيض بخط سفلي ملون، بسيط وأنيق',
-    accent: '#10B981',
-    preview: (
-      <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
-        <div style={{ background: '#fff', padding: '16px 20px', color: '#111', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #0D1117' }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 13 }}>شركة سهل التقنية</div>
-            <div style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>الرياض — الرقم الضريبي: 310...0003</div>
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>فاتورة ضريبية</div>
-            <div style={{ fontSize: 10, color: '#6B7280' }}>INV-2025-009</div>
-          </div>
-        </div>
-        <div style={{ padding: '12px 20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10, fontSize: 10, color: '#6B7280' }}>
-            <div><div style={{ fontWeight: 700 }}>فاتورة إلى</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>شركة الرياض للتجارة</div></div>
-            <div><div style={{ fontWeight: 700 }}>تاريخ الاستحقاق</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>30 مايو 2025</div></div>
-          </div>
-          <div style={{ background: '#F4F6FA', borderRadius: 4, padding: '6px 8px', fontSize: 10, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontWeight: 700, color: '#6B7280' }}>الوصف</span>
-            <span style={{ fontWeight: 700, color: '#6B7280' }}>الإجمالي</span>
-          </div>
-          <div style={{ fontSize: 10, display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #E5E7EB' }}>
-            <span>استشارات تقنية × 5</span><span style={{ fontWeight: 700 }}>12,500</span>
-          </div>
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ fontSize: 10, width: 130 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B7280' }}><span>قبل الضريبة</span><span>12,500</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#F59E0B' }}><span>ضريبة 15%</span><span>1,875</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 12, marginTop: 4, paddingTop: 4, borderTop: '1px solid #E5E7EB' }}><span>الإجمالي</span><span>14,375</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
-  },
-]
+
 
 export default function TemplatesPage() {
+  const company = useAppStore(s => s.company)
   const [selected, setSelected] = useState<TemplateId>(
     (localStorage.getItem(TEMPLATE_KEY) as TemplateId) ?? 'classic'
   )
+
+  const TPLS = [
+    {
+      id: 'classic',
+      name: 'كلاسيكي',
+      desc: 'خلفية داكنة في الرأس، احترافي ورسمي',
+      accent: '#0D1117',
+      preview: (
+        <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
+          <div style={{ background: '#0D1117', padding: '16px 20px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>{company.name || 'شركتي'}</div>
+              <div style={{ fontSize: 10, opacity: .6, marginTop: 2 }}>{company.city || 'الرياض'} — الرقم الضريبي: {company.vat || '—'}</div>
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, opacity: .9 }}>فاتورة ضريبية</div>
+              <div style={{ fontSize: 10, opacity: .6 }}>INV-2025-009</div>
+            </div>
+          </div>
+          <div style={{ padding: '12px 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10, fontSize: 10, color: '#6B7280' }}>
+              <div><div style={{ fontWeight: 700 }}>فاتورة إلى</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>شركة الرياض للتجارة</div></div>
+              <div><div style={{ fontWeight: 700 }}>تاريخ الاستحقاق</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>30 مايو 2025</div></div>
+            </div>
+            <div style={{ background: '#F4F6FA', borderRadius: 4, padding: '6px 8px', fontSize: 10, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontWeight: 700, color: '#6B7280' }}>الوصف</span>
+              <span style={{ fontWeight: 700, color: '#6B7280' }}>الإجمالي</span>
+            </div>
+            <div style={{ fontSize: 10, display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #E5E7EB' }}>
+              <span>استشارات تقنية × 5</span><span style={{ fontWeight: 700 }}>12,500</span>
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ fontSize: 10, width: 130 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B7280' }}><span>قبل الضريبة</span><span>12,500</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#F59E0B' }}><span>ضريبة 15%</span><span>1,875</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 12, marginTop: 4, paddingTop: 4, borderTop: '1px solid #E5E7EB' }}><span>الإجمالي</span><span>14,375</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'modern',
+      name: 'عصري',
+      desc: 'تدرج لوني أزرق، تصميم معاصر وجذاب',
+      accent: '#2563EB',
+      preview: (
+        <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
+          <div style={{ background: 'linear-gradient(135deg,#1a2035,#2563EB)', padding: '16px 20px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>{company.name || 'شركتي'}</div>
+              <div style={{ fontSize: 10, opacity: .6, marginTop: 2 }}>{company.city || 'الرياض'} — الرقم الضريبي: {company.vat || '—'}</div>
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, opacity: .9 }}>فاتورة ضريبية</div>
+              <div style={{ fontSize: 10, opacity: .6 }}>INV-2025-009</div>
+            </div>
+          </div>
+          <div style={{ padding: '12px 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10, fontSize: 10, color: '#6B7280' }}>
+              <div><div style={{ fontWeight: 700 }}>فاتورة إلى</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>شركة الرياض للتجارة</div></div>
+              <div><div style={{ fontWeight: 700 }}>تاريخ الاستحقاق</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>30 مايو 2025</div></div>
+            </div>
+            <div style={{ background: '#EFF6FF', borderRadius: 4, padding: '6px 8px', fontSize: 10, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontWeight: 700, color: '#2563EB' }}>الوصف</span>
+              <span style={{ fontWeight: 700, color: '#2563EB' }}>الإجمالي</span>
+            </div>
+            <div style={{ fontSize: 10, display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #E5E7EB' }}>
+              <span>استشارات تقنية × 5</span><span style={{ fontWeight: 700 }}>12,500</span>
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ fontSize: 10, width: 130 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B7280' }}><span>قبل الضريبة</span><span>12,500</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#F59E0B' }}><span>ضريبة 15%</span><span>1,875</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 12, color: '#2563EB', marginTop: 4, paddingTop: 4, borderTop: '2px solid #2563EB' }}><span>الإجمالي</span><span>14,375</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'clean',
+      name: 'نظيف',
+      desc: 'أبيض بخط سفلي ملون، بسيط وأنيق',
+      accent: '#10B981',
+      preview: (
+        <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.08)' }}>
+          <div style={{ background: '#fff', padding: '16px 20px', color: '#111', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #0D1117' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13 }}>{company.name || 'شركتي'}</div>
+              <div style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>{company.city || 'الرياض'} — الرقم الضريبي: {company.vat || '—'}</div>
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>فاتورة ضريبية</div>
+              <div style={{ fontSize: 10, color: '#6B7280' }}>INV-2025-009</div>
+            </div>
+          </div>
+          <div style={{ padding: '12px 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10, fontSize: 10, color: '#6B7280' }}>
+              <div><div style={{ fontWeight: 700 }}>فاتورة إلى</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>شركة الرياض للتجارة</div></div>
+              <div><div style={{ fontWeight: 700 }}>تاريخ الاستحقاق</div><div style={{ color: '#111', fontWeight: 600, marginTop: 2 }}>30 مايو 2025</div></div>
+            </div>
+            <div style={{ background: '#F4F6FA', borderRadius: 4, padding: '6px 8px', fontSize: 10, display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontWeight: 700, color: '#6B7280' }}>الوصف</span>
+              <span style={{ fontWeight: 700, color: '#6B7280' }}>الإجمالي</span>
+            </div>
+            <div style={{ fontSize: 10, display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #E5E7EB' }}>
+              <span>استشارات تقنية × 5</span><span style={{ fontWeight: 700 }}>12,500</span>
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ fontSize: 10, width: 130 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6B7280' }}><span>قبل الضريبة</span><span>12,500</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#F59E0B' }}><span>ضريبة 15%</span><span>1,875</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 12, marginTop: 4, paddingTop: 4, borderTop: '1px solid #E5E7EB' }}><span>الإجمالي</span><span>14,375</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+  ]
 
 
   const handleSelect = (id: TemplateId) => {
@@ -148,7 +152,7 @@ export default function TemplatesPage() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, marginBottom: 32 }}>
-        {TEMPLATES.map(tpl => (
+        {TPLS.map(tpl => (
           <div
             key={tpl.id}
             style={{

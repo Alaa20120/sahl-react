@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { useUiStore } from '@/store/ui.store'
+import { useAppStore } from '@/store/app.store'
 import { toast } from '@/lib/toast'
 
 interface NavItem {
@@ -59,6 +60,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
   const logout = useAuthStore(s => s.logout)
+  const company = useAppStore(s => s.company)
   const { sidebarCollapsed, toggleSidebar } = useUiStore()
 
   const isDelegate = user?.role === 'delegate'
@@ -86,20 +88,26 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
       <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}${mobileOpen ? ' open' : ''}`}>
         <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="logo-icon" style={{ background: 'none', padding: 0 }}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="36" height="36">
-              <rect x="8" y="8" width="104" height="104" rx="20" fill="#0D1117" />
-              <rect x="24" y="68" width="8" height="20" fill="#FFFFFF" />
-              <rect x="38" y="68" width="8" height="20" fill="#FFFFFF" />
-              <rect x="52" y="68" width="8" height="20" fill="#FFFFFF" />
-              <rect x="20" y="88" width="80" height="4" fill="#FFFFFF" />
-              <circle cx="78" cy="48" r="10" fill="#FFFFFF" />
-              <circle cx="78" cy="48" r="4" fill="#0D1117" />
-              <rect x="94" y="24" width="6" height="56" fill="#FFFFFF" />
-            </svg>
+            {company.logo ? (
+              <img src={company.logo} alt="Logo" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }} />
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="36" height="36">
+                <rect x="8" y="8" width="104" height="104" rx="20" fill="#0D1117" />
+                <rect x="24" y="68" width="8" height="20" fill="#FFFFFF" />
+                <rect x="38" y="68" width="8" height="20" fill="#FFFFFF" />
+                <rect x="52" y="68" width="8" height="20" fill="#FFFFFF" />
+                <rect x="20" y="88" width="80" height="4" fill="#FFFFFF" />
+                <circle cx="78" cy="48" r="10" fill="#FFFFFF" />
+                <circle cx="78" cy="48" r="4" fill="#0D1117" />
+                <rect x="94" y="24" width="6" height="56" fill="#FFFFFF" />
+              </svg>
+            )}
           </div>
           {!sidebarCollapsed && (
             <>
-              <div className="brand">سهل</div>
+              <div className="brand" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
+                {company.name || 'سهل'}
+              </div>
               <div className="edition">Enterprise v5.0</div>
             </>
           )}

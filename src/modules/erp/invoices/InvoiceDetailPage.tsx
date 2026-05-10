@@ -82,7 +82,9 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
   <div class="hdr">
     <div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-        <div style="width:44px;height:44px;border-radius:10px;background:${isLight ? accent + '18' : 'rgba(255,255,255,.15)'};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:${isLight ? accent : '#fff'};flex-shrink:0">س</div>
+        <div style="width:44px;height:44px;border-radius:10px;background:${isLight ? accent + '18' : 'rgba(255,255,255,.15)'};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:${isLight ? accent : '#fff'};flex-shrink:0;overflow:hidden">
+          ${co?.logo ? `<img src="${co.logo}" style="width:100%;height:100%;object-fit:contain" />` : (co?.name ? co.name.charAt(0) : 'س')}
+        </div>
         <div>
           <div class="company-name">${co?.name || 'اسم الشركة'}</div>
           <div class="company-sub">${co?.nameEn || ''}</div>
@@ -390,9 +392,15 @@ export default function InvoiceDetailPage() {
                   width: 44, height: 44, borderRadius: 10,
                   background: tpl.headerColor === '#fff' ? 'rgba(255,255,255,.15)' : tpl.accentColor + '18',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
+                  flexShrink: 0, overflow: 'hidden',
                 }}>
-                  <span style={{ fontSize: 18, fontWeight: 900, color: tpl.headerColor === '#fff' ? '#fff' : tpl.accentColor }}>س</span>
+                  {co.logo ? (
+                    <img src={co.logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <span style={{ fontSize: 18, fontWeight: 900, color: tpl.headerColor === '#fff' ? '#fff' : tpl.accentColor }}>
+                      {co.name ? co.name.charAt(0) : 'س'}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>{co.name || 'اسم الشركة'}</div>

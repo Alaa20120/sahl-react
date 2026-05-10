@@ -1,4 +1,4 @@
-const CACHE = 'sahl-v3'
+const CACHE = 'sahl-v4'
 const OFFLINE_PAGE = '/'
 
 const PRECACHE = [

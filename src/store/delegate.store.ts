@@ -524,7 +524,7 @@ export const useDelegateStore = create<DelegateStore>()(
         set(state => ({
           delegates: state.delegates.map(d => {
             if (d.id !== delegateId) return d
-            return { ...d, warehouse: [], invoices: [], transactions: [], stats: { totalSales: 0, totalPurchases: 0, balance: 0, externalCredit: 0, companyEntrusted: 0 } }
+            return { ...d, warehouse: [], invoices: [], transactions: [], stats: { totalSales: 0, totalPurchases: 0, balance: 0, externalCredit: 0, companyEntrusted: 0, collected: 0, expenses: 0 } }
           }),
         }))
       },

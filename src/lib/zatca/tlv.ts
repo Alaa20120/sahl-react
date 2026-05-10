@@ -51,4 +51,11 @@ export function generateZATCAQR(data: ZATCAInvoiceData): string {
   return bytesToBase64(tlvBytes)
 }
 
+import { useAppStore } from '@/store/app.store'
+
+export const COMPANY_INFO = {
+  get name() { return useAppStore.getState().company.name || '—' },
+  get vatNumber() { return useAppStore.getState().company.vat || '—' },
+}
+
 

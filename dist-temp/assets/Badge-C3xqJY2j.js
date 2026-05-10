@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-BE_tW6Ee.js";var t=e(),n={paid:`مدفوع`,pending:`معلق`,overdue:`متأخر`,draft:`مسودة`,confirmed:`مؤكد`,partial:`جزئي`,active:`نشط`,inactive:`غير نشط`,leave:`إجازة`,returned:`مرتجع`};function r({status:e,label:r}){return(0,t.jsx)(`span`,{className:`status status-${e}`,children:r??n[e]??e})}export{r as t};

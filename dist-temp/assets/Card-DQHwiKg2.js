@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-BE_tW6Ee.js";var t=e();function n({title:e,action:n,children:r,style:i,bodyStyle:a}){return(0,t.jsxs)(`div`,{className:`card`,style:i,children:[e!=null&&(0,t.jsxs)(`div`,{className:`card-header`,children:[(0,t.jsx)(`span`,{className:`card-title`,children:e}),n]}),(0,t.jsx)(`div`,{className:`card-body`,style:a,children:r})]})}export{n as t};

@@ -3,6 +3,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import Card from '@/components/ui/Card'
 import { toast } from '@/lib/toast'
 import { useAppStore } from '@/store/app.store'
+import { useInventoryStore } from '@/store/inventory.store'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 
 // Delete order respects FK dependencies (child → parent)
@@ -278,6 +279,28 @@ export default function SettingsPage() {
 
       {tab === 'النسخ الاحتياطي' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card title="تصحيح المخزون">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+                إذا تضاعفت كميات المخزون بسبب خلل سابق، يمكنك تصحيحها بنقرة واحدة.
+              </p>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => {
+                  if (!window.confirm('⚠️ سيتم تقسيم جميع كميات المخزون على 2. هل أنت متأكد؟')) return
+                  const products = useInventoryStore.getState().products
+                  for (const p of products) {
+                    const fixedQty = Math.floor(p.stock / 2)
+                    useInventoryStore.getState().updateProduct(p.id, { stock: fixedQty })
+                  }
+                  toast('تم تصحيح كميات المخزون بنجاح ✅', 'success')
+                }}
+              >
+                <i className="fa fa-wrench" /> تصحيح كميات المخزون (تقسيم على 2)
+              </button>
+            </div>
+          </Card>
+
           <Card title="النسخ الاحتياطي">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[

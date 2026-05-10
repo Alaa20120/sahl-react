@@ -104,6 +104,6 @@ export const useTreasuryStore = create<TreasuryStore>()(
         }
       },
     }),
-    { name: 'sahl-treasury-v6' }
+    { name: 'sahl-treasury-v7' }
   )
 )

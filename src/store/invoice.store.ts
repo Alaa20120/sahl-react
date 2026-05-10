@@ -303,6 +303,6 @@ export const useInvoiceStore = create<InvoiceStore>()(
         return returnInvoice
       },
     }),
-    { name: 'sahl-invoices-v6' }
+    { name: 'sahl-invoices-v7' }
   )
 )

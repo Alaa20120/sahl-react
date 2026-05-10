@@ -7,7 +7,9 @@ import { type Invoice, type InvoiceStatus } from '@/lib/mock-data/invoices'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { useInventoryStore } from '@/store/inventory.store'
 import { useCustomerStore } from '@/store/customer.store'
+import { useTreasuryStore } from '@/store/treasury.store'
 import { useAppStore } from '@/store/app.store'
+import { printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
 
 type TplId = 'classic' | 'modern' | 'clean' | 'minimal' | 'bold'
@@ -210,6 +212,7 @@ export default function InvoiceDetailPage() {
   const { invoices, addPayment, updateStatus, confirmInvoice, createReturn } = useInvoiceStore()
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
   const { updateBalance: updateCustomerBalance } = useCustomerStore()
+  const addTreasuryTransaction = useTreasuryStore(s => s.addTransaction)
   const co = useAppStore(s => s.company)
   const invoice = invoices.find(i => i.id === id)
 
@@ -242,17 +245,44 @@ export default function InvoiceDetailPage() {
   const handlePayment = async () => {
     if (!payAmount) { toast('يرجى إدخال المبلغ', 'warn'); return }
     const amt = parseFloat(payAmount)
-    if (amt > (invoice.total - (invoice.paidAmount || 0))) {
-      toast('المبلغ المدفوع أكبر من المتبقي!', 'warn'); return
-    }
-    // Record payment (includes treasury transaction internally)
+    const remaining = invoice.total - (invoice.paidAmount || 0)
+    if (amt > remaining) { toast('المبلغ أكبر من المتبقي!', 'warn'); return }
+
+    const ref = `PMT-${invoice.number}-${Date.now()}`
+    const today = new Date().toISOString().slice(0, 10)
+
+    // 1. Record in invoice store
     await addPayment(invoice.id, amt)
-    // Update customer balance — payment received reduces what they owe
+
+    // 2. Record in treasury
+    const accountId = payMethod === 'cash' ? 'cash' : payMethod === 'bank' ? 'bank' : 'cash'
+    await addTreasuryTransaction({
+      date: today,
+      description: `سداد فاتورة ${invoice.number} — ${invoice.customer}`,
+      type: 'in',
+      category: 'collection',
+      amount: amt,
+      account: accountId,
+      ref,
+    })
+
+    // 3. Update customer balance
     if (invoice.customerId) {
       await updateCustomerBalance(invoice.customerId, -amt)
     }
-    toast(`تم تسجيل دفعة ${fmt(amt)} وتحديث رصيد العميل والخزينة ✅`, 'success')
-    setShowPayment(false); setPayAmount('')
+
+    // 4. Print receipt automatically
+    printFinancialReceipt(
+      co,
+      'in', amt,
+      `سداد فاتورة ${invoice.number} — ${invoice.customer}`,
+      payMethod === 'cash' ? 'نقدي' : payMethod === 'bank' ? 'بنك' : 'بطاقة',
+      'تحصيل', ref
+    )
+
+    toast(`تم تسجيل دفعة ${fmt(amt)} وتحديث الخزينة والعميل ✅`, 'success')
+    setShowPayment(false)
+    setPayAmount('')
   }
 
   const handleConfirm = () => {

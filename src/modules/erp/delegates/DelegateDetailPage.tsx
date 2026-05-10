@@ -494,20 +494,7 @@ export default function DelegateDetailPage() {
                         <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
                         <td>{fmt(r.cost)}</td>
                         <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
-                        <td>
-                          {r.available > 0 && (
-                            <button
-                              className="btn btn-outline btn-sm"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                if (r.ids[0]) handleTransfer(r.ids[0], r.available, r.name, r.cost)
-                              }}
-                            >
-                              <i className="fa fa-exchange-alt" /> تحويل للمخزن
-                            </button>
-                          )}
-                        </td>
+                        <td></td>
                       </tr>
                     ))}
                   </tbody>

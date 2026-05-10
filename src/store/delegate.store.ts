@@ -34,6 +34,7 @@ interface DelegateStore {
   resetDelegateData: (delegateId: string) => Promise<void>
   voidDelegateInvoice: (delegateId: string, invoiceId: string, reason?: string) => Promise<void>
   validateLogin: (username: string, password: string) => Delegate | null
+  setWarehouseQty: (delegateId: string, warehouseItemId: string, newQty: number) => void
 }
 
 function generateUsername(name: string): string {
@@ -591,6 +592,18 @@ export const useDelegateStore = create<DelegateStore>()(
           delegates: state.delegates.map(d => {
             if (d.id !== delegateId) return d
             return { ...d, warehouse: [], invoices: [], transactions: [], stats: { totalSales: 0, totalPurchases: 0, balance: 0, externalCredit: 0, companyEntrusted: 0, collected: 0, expenses: 0 } }
+          }),
+        }))
+      },
+
+      setWarehouseQty(delegateId, warehouseItemId, newQty) {
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            return {
+              ...d,
+              warehouse: d.warehouse.map(w => w.id === warehouseItemId ? { ...w, qty: Math.max(0, newQty) } : w)
+            }
           }),
         }))
       },

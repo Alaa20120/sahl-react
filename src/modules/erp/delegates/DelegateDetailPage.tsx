@@ -104,6 +104,7 @@ export default function DelegateDetailPage() {
   const withdrawFromDelegate = useDelegateStore(s => s.withdrawFromDelegate)
   const transferToMainWarehouse = useDelegateStore(s => s.transferToMainWarehouse)
   const resetDelegateData = useDelegateStore(s => s.resetDelegateData)
+  const setWarehouseQty = useDelegateStore(s => s.setWarehouseQty)
   const addTreasuryTransaction = useTreasuryStore(s => s.addTransaction)
   const accounts = useTreasuryStore(s => s.accounts)
   const customers = useCustomerStore(s => s.customers)
@@ -494,7 +495,19 @@ export default function DelegateDetailPage() {
                         <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
                         <td>{fmt(r.cost)}</td>
                         <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
-                        <td></td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button className="btn btn-sm btn-outline" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => {
+                            const whItem = d.warehouse.find(w => (w.productId || w.productName) === r.key)
+                            if (!whItem) return
+                            const val = prompt(`تعديل كمية "${r.name}" في المستودع:\nالمستلم حالياً: ${r.received}\nالمباع: ${r.sold}\nأدخل الكمية المستلمة الجديدة:`, String(r.received))
+                            if (val !== null) {
+                              const newQty = parseInt(val) || 0
+                              setWarehouseQty(d.id, whItem.id, newQty)
+                            }
+                          }}>
+                            ✏️ تعديل
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

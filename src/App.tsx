@@ -82,22 +82,6 @@ function AppDataProvider() {
   const initAuth = useAuthStore(s => s.initAuth)
 
   useEffect(() => {
-    // One-time fix: correct doubled stock quantity for L2 plastic eggs
-    if (!localStorage.getItem('sahl-fix-l2-stock-2026-05-10')) {
-      const store = useDelegateStore.getState()
-      const fixedDelegates = store.delegates.map(d => ({
-        ...d,
-        warehouse: d.warehouse.map(w => {
-          if (w.productName === 'بيض L2 بلاستيك كامل' && w.qty === 119) {
-            return { ...w, qty: 99 }
-          }
-          return w
-        })
-      }))
-      useDelegateStore.setState({ delegates: fixedDelegates })
-      localStorage.setItem('sahl-fix-l2-stock-2026-05-10', 'true')
-    }
-
     // Init Supabase auth listener — handles session restore on refresh automatically
     const unsubscribe = initAuth()
 

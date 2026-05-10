@@ -32,6 +32,7 @@ export default function DelegatePage() {
   const confirmDelegateInvoice = useDelegateStore(s => s.confirmDelegateInvoice)
   const deductFromWarehouse = useDelegateStore(s => s.deductFromWarehouse)
   const addToWarehouse = useDelegateStore(s => s.addToWarehouse)
+  const setWarehouseQty = useDelegateStore(s => s.setWarehouseQty)
 
   const d = delegate || {
     id: delegateId,
@@ -457,6 +458,7 @@ export default function DelegatePage() {
                     <th style={{ textAlign: 'center', color: 'var(--success)' }}>المتوفر</th>
                     <th>سعر التكلفة</th>
                     <th>قيمة المتوفر</th>
+                    <th style={{ textAlign: 'center', color: 'var(--warn)', fontSize: 11 }}>تعديل مؤقت</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -468,9 +470,22 @@ export default function DelegatePage() {
                       <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
                       <td>{fmt(r.cost)}</td>
                       <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button className="btn btn-sm btn-outline" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => {
+                          const whItem = delegateWarehouse.find((w: any) => (w.productId || w.productName) === r.key)
+                          if (!whItem) return
+                          const val = prompt(`تعديل كمية "${r.name}" في المستودع:\nالمستلم حالياً: ${r.received}\nالمباع: ${r.sold}\nأدخل الكمية المستلمة الجديدة:`, String(r.received))
+                          if (val !== null) {
+                            const newQty = parseInt(val) || 0
+                            setWarehouseQty(delegateId, whItem.id, newQty)
+                          }
+                        }}>
+                          ✏️ تعديل
+                        </button>
+                      </td>
                     </tr>
                   ))}
-                  {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
@@ -480,6 +495,7 @@ export default function DelegatePage() {
                     <td style={{ textAlign: 'center', color: 'var(--success)' }}>{fmtNum(rows.reduce((s, r) => s + r.available, 0))}</td>
                     <td></td>
                     <td>{fmt(rows.reduce((s, r) => s + r.available * r.cost, 0))}</td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </table>

@@ -631,27 +631,9 @@ export default function InventoryPage() {
         open={showWithdrawDlg}
         onClose={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawProductId(''); setWithdrawQtyInput('') }}
         title="سحب صنف من مستودع مندوب"
-        width={480}
+        width={560}
         footer={
-          <>
-            <button className="btn btn-outline" onClick={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawProductId(''); setWithdrawQtyInput('') }}>إلغاء</button>
-            <button className="btn btn-primary" disabled={!withdrawDelegateId || !withdrawProductId || !withdrawQtyInput} onClick={async () => {
-              const qty = parseInt(withdrawQtyInput)
-              if (isNaN(qty) || qty <= 0) { toast('أدخل كمية صحيحة', 'warn'); return }
-              const agg = getAggregatedWarehouse(withdrawDelegateId)
-              const item = agg.find(a => a.productId === withdrawProductId)
-              if (!item) { toast('الصنف غير موجود', 'warn'); return }
-              if (qty > item.available) { toast('الكمية المطلوبة أكبر من المتاح', 'warn'); return }
-              await transferToMainWarehouse(withdrawDelegateId, withdrawProductId, qty)
-              toast(`تم سحب ${qty} ${item.productName} وإضافته للمخزن الرئيسي`, 'success')
-              setShowWithdrawDlg(false)
-              setWithdrawDelegateId('')
-              setWithdrawProductId('')
-              setWithdrawQtyInput('')
-            }}>
-              <i className="fa fa-check" /> تأكيد السحب
-            </button>
-          </>
+          <button className="btn btn-outline" onClick={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawProductId(''); setWithdrawQtyInput('') }}>إغلاق</button>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -665,20 +647,60 @@ export default function InventoryPage() {
             </select>
           </div>
           {withdrawDelegateId && (
-            <div className="form-group">
-              <label className="form-label">الصنف</label>
-              <select className="form-control" value={withdrawProductId} onChange={e => { setWithdrawProductId(e.target.value); setWithdrawQtyInput('') }}>
-                <option value="">اختر صنف...</option>
-                {getAggregatedWarehouse(withdrawDelegateId).map(a => (
-                  <option key={a.productId} value={a.productId}>{a.productName} — وارد: {a.received} | مباع: {a.sold} | متاح: {a.available} {a.productSku ? `(${a.productSku})` : ''}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          {withdrawProductId && (
-            <div className="form-group">
-              <label className="form-label">الكمية المراد سحبها</label>
-              <input className="form-control" type="number" min="1" value={withdrawQtyInput} onChange={e => setWithdrawQtyInput(e.target.value)} placeholder="أدخل الكمية..." />
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الصنف</th>
+                    <th style={{ textAlign: 'center' }}>وارد</th>
+                    <th style={{ textAlign: 'center' }}>مباع</th>
+                    <th style={{ textAlign: 'center' }}>متاح</th>
+                    <th style={{ textAlign: 'center', width: 100 }}>سحب</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getAggregatedWarehouse(withdrawDelegateId).map(a => (
+                    <tr key={a.productId}>
+                      <td style={{ fontWeight: 600 }}>{a.productName} <span style={{ fontSize: 11, color: 'var(--muted)' }}>{a.productSku}</span></td>
+                      <td style={{ textAlign: 'center' }}>{a.received}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{a.sold || '—'}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: a.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{a.available}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max={a.available}
+                          className="form-control"
+                          style={{ width: 80, textAlign: 'center', padding: '4px 6px', fontSize: 12 }}
+                          placeholder="Qty"
+                          onChange={e => { setWithdrawProductId(a.productId); setWithdrawQtyInput(e.target.value) }}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={async () => {
+                            const input = document.querySelector(`input[data-withdraw="${a.productId}"]`) as HTMLInputElement
+                            const qty = parseInt(input?.value || withdrawQtyInput)
+                            if (isNaN(qty) || qty <= 0) { toast('أدخل كمية صحيحة', 'warn'); return }
+                            if (qty > a.available) { toast('الكمية أكبر من المتاح', 'warn'); return }
+                            await transferToMainWarehouse(withdrawDelegateId, a.productId, qty)
+                            toast(`تم سحب ${qty} ${a.productName} للمخزن الرئيسي`, 'success')
+                            setWithdrawProductId('')
+                            setWithdrawQtyInput('')
+                          }}
+                        >
+                          <i className="fa fa-check" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {getAggregatedWarehouse(withdrawDelegateId).length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>لا يوجد أصناف متاحة في المستودع</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -103,6 +103,7 @@ export default function DelegateDetailPage() {
   const delegates = useDelegateStore(s => s.delegates)
   const withdrawFromDelegate = useDelegateStore(s => s.withdrawFromDelegate)
   const transferToMainWarehouse = useDelegateStore(s => s.transferToMainWarehouse)
+  const resetDelegateData = useDelegateStore(s => s.resetDelegateData)
   const addTreasuryTransaction = useTreasuryStore(s => s.addTransaction)
   const accounts = useTreasuryStore(s => s.accounts)
   const customers = useCustomerStore(s => s.customers)
@@ -392,6 +393,11 @@ export default function DelegateDetailPage() {
             <span><i className="fa fa-warehouse" style={{ marginLeft: 8, color: 'var(--blue)' }} /> مستودع المندوب</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>إجمالي القيمة: <strong style={{ color: 'var(--text)' }}>{fmt(whTotal)}</strong></span>
+              <button className="btn btn-sm" style={{ background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => {
+                if (!confirm('تحذير: سيتم مسح كل بيانات المندوب (المستودع، الفواتير، الحركات) وإرجاع المخزون للمخزن الرئيسي. هل أنت متأكد؟')) return
+                resetDelegateData(d.id)
+                toast('تم مسح بيانات المندوب وإرجاع المخزون للمخزن الرئيسي', 'success')
+              }}><i className="fa fa-trash" /> reset</button>
               <button className="btn btn-outline btn-sm" onClick={() => {
                 // Export aggregated view (received/sold/available)
                 const soldQty: Record<string, number> = {}

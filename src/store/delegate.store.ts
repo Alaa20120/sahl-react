@@ -30,6 +30,7 @@ interface DelegateStore {
   getAggregatedWarehouse: (delegateId: string) => { productId: string; productName: string; productSku: string; received: number; sold: number; available: number }[]
   transferToMainWarehouse: (delegateId: string, productId: string, qty: number) => Promise<void>
   remitToCompany: (delegateId: string, amount: number, description: string) => Promise<void>
+  resetDelegateData: (delegateId: string) => Promise<void>
   validateLogin: (username: string, password: string) => Delegate | null
 }
 
@@ -505,7 +506,28 @@ export const useDelegateStore = create<DelegateStore>()(
           }),
         }))
       },
-    }),
+
+      async resetDelegateData(delegateId) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return
+        // Return all warehouse stock to main inventory
+        for (const item of delegate.warehouse) {
+          if (item.productId) {
+            await useInventoryStore.getState().addStock(item.productId, item.qty, `delegate_reset_${delegateId}`)
+          }
+        }
+        if (isSupabaseConfigured()) {
+          await supabase.from('delegate_warehouse').delete().eq('delegate_id', delegateId)
+          await supabase.from('delegate_invoices').delete().eq('delegate_id', delegateId)
+          await supabase.from('delegate_transactions').delete().eq('delegate_id', delegateId)
+        }
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            return { ...d, warehouse: [], invoices: [], transactions: [], stats: { totalSales: 0, totalPurchases: 0, balance: 0, externalCredit: 0, companyEntrusted: 0 } }
+          }),
+        }))
+      },
     { name: 'sahl-delegates-v3' }
   )
 )

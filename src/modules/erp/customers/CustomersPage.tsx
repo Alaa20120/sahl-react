@@ -10,6 +10,7 @@ import { useInvoiceStore } from '@/store/invoice.store'
 import { usePurchaseStore } from '@/store/purchase.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useTreasuryStore } from '@/store/treasury.store'
+import { useAppStore } from '@/store/app.store'
 import { printPaymentReceipt, printAccountStatement } from '@/lib/print'
 import { type CustomerType } from '@/lib/mock-data/customers'
 import { toast } from '@/lib/toast'
@@ -145,7 +146,9 @@ export default function CustomersPage() {
         ref: payment.refId,
       })
 
+      const co = useAppStore.getState().company
       printPaymentReceipt(
+        co,
         profileCustomer.name,
         amount,
         (paymentType === 'in' ? 'collection' : 'payment') as 'collection' | 'payment',
@@ -269,7 +272,9 @@ export default function CustomersPage() {
         ]
       : items
 
+    const co = useAppStore.getState().company
     printAccountStatement(
+      co,
       profileCustomer.name,
       allItems,
       '2024-01-01',

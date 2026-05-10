@@ -161,7 +161,7 @@ export default function TemplatesPage() {
               overflow: 'hidden', transition: '.2s', cursor: 'pointer',
               boxShadow: selected === tpl.id ? `0 0 0 3px ${tpl.accent}22` : 'none',
             }}
-            onClick={() => handleSelect(tpl.id)}
+            onClick={() => handleSelect(tpl.id as TemplateId)}
           >
             {/* Preview */}
             <div style={{ padding: 16, background: 'var(--bg)' }}>

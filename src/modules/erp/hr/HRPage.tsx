@@ -368,7 +368,7 @@ export default function HRPage() {
                           <button className="btn btn-icon btn-outline btn-sm" title="عرض البروفايل" onClick={() => setProfileEmp(e.id)}><i className="fa fa-eye" /></button>
                           <button className="btn btn-icon btn-outline btn-sm" title="طباعة قسيمة الراتب" onClick={() => {
                             const month = new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })
-                            printPayslip(e, month)
+                            printPayslip(useAppStore.getState().company, e, month)
                           }}><i className="fa fa-print" /></button>
                           <button className="btn btn-icon btn-outline btn-sm" title="تعديل" onClick={() => {
                             setEditEmpId(e.id)
@@ -779,7 +779,7 @@ export default function HRPage() {
               <button className="btn btn-outline" onClick={() => setProfileEmp(null)}>إغلاق</button>
               <button className="btn btn-outline" onClick={() => {
                 const month = new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })
-                printPayslip(emp, month)
+                printPayslip(useAppStore.getState().company, emp, month)
               }}><i className="fa fa-print" /> طباعة قسيمة الراتب</button>
               <button className={`btn ${emp.status === 'active' ? 'btn-outline' : 'btn-primary'}`} style={{ color: emp.status === 'active' ? 'var(--warn)' : undefined }}
                 onClick={() => {

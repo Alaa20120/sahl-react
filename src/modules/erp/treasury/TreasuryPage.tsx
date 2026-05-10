@@ -8,6 +8,7 @@ import { type TxType, type TxCategory } from '@/lib/mock-data/treasury'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { usePurchaseStore } from '@/store/purchase.store'
+import { useAppStore } from '@/store/app.store'
 import { exportExcel } from '@/lib/excel'
 import { printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
@@ -72,7 +73,7 @@ export default function TreasuryPage() {
       // Print receipt automatically
       const accountName = accounts.find(a => a.id === selectedAccount)?.label ?? selectedAccount
       const categoryLabel = txCategory === 'invoice' ? 'فواتير' : txCategory === 'expense' ? 'مصروفات' : txCategory === 'salary' ? 'رواتب' : txCategory === 'purchase' ? 'مشتريات' : txCategory === 'transfer' ? 'تحويل' : 'أخرى'
-      printFinancialReceipt(txType, amt, desc, accountName, categoryLabel, ref)
+      printFinancialReceipt(useAppStore.getState().company, txType, amt, desc, accountName, categoryLabel, ref)
 
       toast(`تم تسجيل ${txType === 'in' ? 'إيراد' : 'مصروف'} بقيمة ${fmt(amt)}`, 'success')
       setShowNew(false)

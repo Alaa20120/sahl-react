@@ -102,7 +102,7 @@ export function exportExcel(cfg: ExcelConfig): void {
   const {
     title,
     filename,
-    company = 'شركة سهل التقنية',
+    company = 'شركتي',
     columns,
     rows,
     totals,

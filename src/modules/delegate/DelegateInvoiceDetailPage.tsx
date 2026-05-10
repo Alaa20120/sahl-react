@@ -98,7 +98,7 @@ export default function DelegateInvoiceDetailPage() {
     })
 
     // Print receipt automatically
-    printFinancialReceipt('in', amount, `تحصيل فاتورة ${invoice.number} — ${invoice.party}`, 'نقدي', 'تحصيل', ref)
+    printFinancialReceipt(co, 'in', amount, `تحصيل فاتورة ${invoice.number} — ${invoice.party}`, 'نقدي', 'تحصيل', ref)
 
     toast(`تم تسجيل دفعة ${fmt(amount)} وتحديث الخزنة بنجاح`, 'success')
     setPayAmount('')

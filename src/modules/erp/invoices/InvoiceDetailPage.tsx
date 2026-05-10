@@ -34,7 +34,7 @@ function openPrintWindow(
   status: InvoiceStatus,
   tpl: typeof TEMPLATES[0],
   isVoided: boolean,
-  co?: { name: string; nameEn: string; vat: string; cr: string; phone: string; email: string; address: string; city: string },
+  co?: { name: string; nameEn: string; vat: string; cr: string; phone: string; email: string; address: string; city: string; logo: string | null },
 ) {
   const win = window.open('', '_blank', 'width=920,height=760')
   if (!win) { toast('يرجى السماح بالنوافذ المنبثقة', 'warn'); return }

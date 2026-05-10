@@ -7,6 +7,7 @@ import { CATEGORIES, type Product } from '@/lib/mock-data/inventory'
 import { useInventoryStore } from '@/store/inventory.store'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { useDelegateStore } from '@/store/delegate.store'
+import { useAppStore } from '@/store/app.store'
 import { toast } from '@/lib/toast'
 import { printStockReceipt } from '@/lib/print'
 
@@ -112,7 +113,7 @@ export default function ProductDetailPage() {
     setWithdrawQty('')
 
     // Print receipt
-    printStockReceipt(delegate.name, original.name, qty, original.unit, qty * original.costPrice)
+    printStockReceipt(useAppStore.getState().company, delegate.name, original.name, qty, original.unit, qty * original.costPrice)
   }
 
   return (

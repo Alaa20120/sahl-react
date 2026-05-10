@@ -51,8 +51,4 @@ export function generateZATCAQR(data: ZATCAInvoiceData): string {
   return bytesToBase64(tlvBytes)
 }
 
-// Company info for الفروج الوطني
-export const COMPANY_INFO = {
-  name: 'الفروج الوطني',
-  vatNumber: '310123456700003', // placeholder — replace with actual
-}
+

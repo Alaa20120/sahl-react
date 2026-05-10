@@ -7,6 +7,7 @@ import { fmt, fmtNum, fmtDate } from '@/lib/format'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { useCustomerStore } from '@/store/customer.store'
+import { useAppStore } from '@/store/app.store'
 import { printDelegateWithdrawalReceipt, printStockReceipt, printAccountStatement, printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
 import { exportExcel } from '@/lib/excel'
@@ -166,7 +167,9 @@ export default function DelegateDetailPage() {
       ref,
     })
     // Print receipt
+    const co = useAppStore.getState().company
     printDelegateWithdrawalReceipt(
+      co,
       d!.name,
       amt,
       desc,
@@ -202,7 +205,7 @@ export default function DelegateDetailPage() {
     })
 
     // Print receipt
-    printFinancialReceipt('in', amt, `${desc} — عبر المندوب ${d!.name}`, 'نقدي', 'تحصيل', ref)
+    printFinancialReceipt(useAppStore.getState().company, 'in', amt, `${desc} — عبر المندوب ${d!.name}`, 'نقدي', 'تحصيل', ref)
 
     toast(`تم تحصيل ${fmt(amt)} وتسجيله في الخزنة`, 'success')
     setCollectAmount('')
@@ -213,7 +216,7 @@ export default function DelegateDetailPage() {
 
   function handleTransfer(whItemId: string, qty: number, name: string, costPrice: number) {
     transferToMainWarehouse(d!.id, whItemId, qty)
-    printStockReceipt(d!.name, name, qty, 'وحدة', qty * costPrice)
+    printStockReceipt(useAppStore.getState().company, d!.name, name, qty, 'وحدة', qty * costPrice)
     toast(`تم تحويل ${qty} من "${name}" للمخزن الرئيسي`, 'success')
   }
 
@@ -623,7 +626,7 @@ export default function DelegateDetailPage() {
                     debit: tx.amount > 0 ? tx.amount : 0, credit: tx.amount < 0 ? Math.abs(tx.amount) : 0,
                     balance: tx.balanceAfter, ref: tx.reference ?? tx.id,
                   }))
-                  printAccountStatement(d.name, items, '2024-01-01', new Date().toISOString().slice(0, 10), 'delegate')
+                  printAccountStatement(useAppStore.getState().company, d.name, items, '2024-01-01', new Date().toISOString().slice(0, 10), 'delegate')
                 }}><i className="fa fa-print" /> طباعة</button>
               </div>
               <div className="table-wrap">

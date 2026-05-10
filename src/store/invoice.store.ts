@@ -290,8 +290,10 @@ export const useInvoiceStore = create<InvoiceStore>()(
         })
 
         // Mark original invoice as returned
-        const updatedInvoices = state.invoices.map(inv => inv.id === originalInvoiceId ? { ...inv, status: 'returned' as const } : inv)
-        set(state => ({ invoices: [returnInvoice, ...updatedInvoices] }))
+        set(state => {
+          const updatedInvoices = state.invoices.map(inv => inv.id === originalInvoiceId ? { ...inv, status: 'returned' as const } : inv)
+          return { invoices: [returnInvoice, ...updatedInvoices] }
+        })
         return returnInvoice
       },
     }),

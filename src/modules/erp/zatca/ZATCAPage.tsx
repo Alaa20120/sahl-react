@@ -4,6 +4,7 @@ import Card from '@/components/ui/Card'
 import StatCard from '@/components/ui/StatCard'
 import { fmt } from '@/lib/format'
 import { toast } from '@/lib/toast'
+import { useAppStore } from '@/store/app.store'
 
 const VAT_PERIODS = [
   { period: 'Q1 2025 (يناير–مارس)', status: 'filed',   dueDate: '2025-04-30', vatOut: 42840, vatIn: 14700, net: 28140 },
@@ -22,6 +23,7 @@ const STATUS_COLORS: Record<string, string> = { filed: 'var(--success)', pending
 const STATUS_LABELS: Record<string, string> = { filed: 'مُقدَّم', pending: 'معلق', overdue: 'متأخر', approved: 'معتمد' }
 
 export default function ZATCAPage() {
+  const company = useAppStore(s => s.company)
   const [tab, setTab] = useState('الإقرارات')
 
   const currentVat = 8107.5 + 1121.25 + 1690.5 + 3795
@@ -55,7 +57,7 @@ export default function ZATCAPage() {
         </div>
         <div style={{ textAlign: 'left' }}>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginBottom: 2 }}>رقم التسجيل الضريبي</div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: 2 }}>310123456700003</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: 2 }}>{company.vat || '—'}</div>
         </div>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 0 3px rgba(16,185,129,.3)' }} />
       </div>

@@ -289,7 +289,14 @@ export const useInvoiceStore = create<InvoiceStore>()(
           ref: returnNumber,
         })
 
-        // Mark original invoice as returned
+        // Mark original invoice as returned — update BOTH local state AND Supabase
+        if (isSupabaseConfigured()) {
+          await supaFetch('invoices', {
+            method: 'PATCH',
+            filter: 'id=eq.' + originalInvoiceId,
+            body: { status: 'returned' },
+          })
+        }
         const currentInvoices = get().invoices
         const updatedInvoices = currentInvoices.map((inv: Invoice) => inv.id === originalInvoiceId ? { ...inv, status: 'returned' as const } : inv)
         set({ invoices: [returnInvoice, ...updatedInvoices] })

@@ -38,13 +38,15 @@
 
 .hidden { display: none !important; }
 
-html { direction: rtl; }
+html { direction: rtl; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 body {
   font-family: 'Tajawal', 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   font-size: 14px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -862,7 +864,6 @@ tbody tr:hover td { background: #FAFBFC; }
   .table-wrap {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
   }
 
   /* Prevent any horizontal page overflow on mobile */

@@ -223,7 +223,9 @@ export default function InvoiceDetailPage() {
   const [payAmount, setPayAmount]     = useState('')
   const [payMethod, setPayMethod]     = useState<'cash' | 'bank' | 'card'>('bank')
   const status = invoice?.status ?? 'pending'
-  const [isVoided, setIsVoided]       = useState(false)
+  // isVoided comes from actual invoice status — persists across refresh
+  const isVoided = status === 'returned'
+  const [, setIsVoided] = useState(false) // kept for compatibility
   const [voidReason, setVoidReason]   = useState('')
   const [sendEmail, setSendEmail]     = useState('client@company.sa')
 

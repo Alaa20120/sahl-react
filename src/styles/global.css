@@ -846,10 +846,22 @@ tbody tr:hover td { background: #FAFBFC; }
     flex-wrap: wrap;
   }
 
-  /* Make all tables scroll horizontally */
+  /* Make all tables scroll horizontally & vertically on mobile */
   .table-wrap {
     overflow-x: auto !important;
+    overflow-y: auto !important;
+    max-height: 60vh;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-2) transparent;
+  }
+  .table-wrap::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .table-wrap::-webkit-scrollbar-thumb {
+    background: var(--border-2);
+    border-radius: 4px;
   }
 
   /* Prevent any element from breaking viewport width */

@@ -435,7 +435,7 @@ export const useDelegateStore = create<DelegateStore>()(
           grouped[item.productId].received += item.qty
         }
         for (const inv of delegate.invoices) {
-          if (inv.type === 'sale' && inv.status === 'confirmed') {
+          if (inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid')) {
             for (const it of inv.items) {
               if (it.productId && grouped[it.productId]) {
                 grouped[it.productId].sold += it.qty
@@ -446,7 +446,7 @@ export const useDelegateStore = create<DelegateStore>()(
         for (const key in grouped) {
           grouped[key].available = grouped[key].received - grouped[key].sold
         }
-        return Object.values(grouped).filter(g => g.available > 0)
+        return Object.values(grouped)
       },
 
       async transferToMainWarehouse(delegateId, productId, qty) {

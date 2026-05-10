@@ -199,7 +199,7 @@ input, select, textarea { font-family: inherit; }
 .card-title { font-size: 15px; font-weight: 700; color: var(--primary); }
 
 /* ─── STAT CARDS ─────────────────────────────────── */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .stat-card {
   background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 18px 20px;
@@ -763,7 +763,7 @@ tbody tr:hover td { background: #FAFBFC; }
 
   /* Delegate page: stats grid single column on very small */
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   /* Fix filter bars to wrap */
@@ -785,7 +785,7 @@ tbody tr:hover td { background: #FAFBFC; }
 
 @media (max-width: 480px) {
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -839,7 +839,7 @@ tbody tr:hover td { background: #FAFBFC; }
 
   /* Stats grid always 2 cols max */
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, 1fr);
   }
   .stat-value {
     word-break: break-word;
@@ -900,7 +900,7 @@ tbody tr:hover td { background: #FAFBFC; }
 @media (max-width: 480px) {
   /* 1 column on very small screens */
   .stats-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
   [style*="repeat(3"],
   [style*="repeat(4"],

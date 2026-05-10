@@ -428,14 +428,16 @@ export const useDelegateStore = create<DelegateStore>()(
         const delegate = get().delegates.find(d => d.id === delegateId)
         if (!delegate) return []
         const grouped: Record<string, { productId: string; productName: string; productSku: string; received: number; sold: number; available: number }> = {}
+        // warehouse.qty is already net of deductions (confirm + transfers)
         for (const item of delegate.warehouse) {
           if (!grouped[item.productId]) {
             grouped[item.productId] = { productId: item.productId, productName: item.productName, productSku: item.productSku, received: 0, sold: 0, available: 0 }
           }
-          grouped[item.productId].received += item.qty
+          grouped[item.productId].available += item.qty
         }
+        // sold from confirmed/paid sale invoices
         for (const inv of delegate.invoices) {
-          if (inv.type === 'sale' && inv.status === 'confirmed') {
+          if (inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid')) {
             for (const it of inv.items) {
               if (it.productId && grouped[it.productId]) {
                 grouped[it.productId].sold += it.qty
@@ -443,8 +445,9 @@ export const useDelegateStore = create<DelegateStore>()(
             }
           }
         }
+        // received (original) = available (current warehouse) + sold
         for (const key in grouped) {
-          grouped[key].available = grouped[key].received - grouped[key].sold
+          grouped[key].received = grouped[key].available + grouped[key].sold
         }
         return Object.values(grouped).filter(g => g.available > 0)
       },
@@ -591,6 +594,6 @@ export const useDelegateStore = create<DelegateStore>()(
         }
       },
     }),
-    { name: 'sahl-delegates-v4' }
+    { name: 'sahl-delegates-v5' }
   )
 )

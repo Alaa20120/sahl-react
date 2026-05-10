@@ -10,6 +10,7 @@ import {
 } from '@/lib/mock-data/delegates'
 import { useTreasuryStore } from './treasury.store'
 import { useInventoryStore } from './inventory.store'
+import { useCustomerStore } from './customer.store'
 
 interface DelegateStore {
   delegates: Delegate[]
@@ -31,6 +32,7 @@ interface DelegateStore {
   transferToMainWarehouse: (delegateId: string, productId: string, qty: number) => Promise<void>
   remitToCompany: (delegateId: string, amount: number, description: string) => Promise<void>
   resetDelegateData: (delegateId: string) => Promise<void>
+  voidDelegateInvoice: (delegateId: string, invoiceId: string, reason?: string) => Promise<void>
   validateLogin: (username: string, password: string) => Delegate | null
 }
 
@@ -527,6 +529,66 @@ export const useDelegateStore = create<DelegateStore>()(
             return { ...d, warehouse: [], invoices: [], transactions: [], stats: { totalSales: 0, totalPurchases: 0, balance: 0, externalCredit: 0, companyEntrusted: 0, collected: 0, expenses: 0 } }
           }),
         }))
+      },
+
+      async voidDelegateInvoice(delegateId, invoiceId, reason) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return
+        const invoice = delegate.invoices.find(inv => inv.id === invoiceId)
+        if (!invoice) return
+        if (invoice.status === 'draft' || invoice.status === 'cancelled') return
+
+        // Reverse stock for confirmed/paid sale invoices
+        if (invoice.type === 'sale' && (invoice.status === 'confirmed' || invoice.status === 'paid')) {
+          for (const item of invoice.items) {
+            if (item.productId) {
+              await get().addToWarehouse(delegateId, {
+                productId: item.productId,
+                productName: item.description,
+                productSku: (item as any).sku || '',
+                qty: item.qty,
+                costPrice: item.price,
+                source: 'company',
+                receivedDate: new Date().toISOString().slice(0, 10),
+              })
+            }
+          }
+        }
+
+        // Reverse customer balance for credit sales
+        if (invoice.type === 'sale' && invoice.paymentMethod === 'credit' && invoice.customerId) {
+          await useCustomerStore.getState().updateBalance(invoice.customerId, invoice.total)
+        }
+
+        // Update invoice status to draft and record void info
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            const wasPending = invoice.status === 'pending' || invoice.status === 'overdue'
+            const totalSales = Math.max(0, d.stats.totalSales - (invoice.type === 'sale' ? invoice.total : 0))
+            const totalPurchases = Math.max(0, d.stats.totalPurchases - (invoice.type === 'purchase' ? invoice.total : 0))
+            const externalCredit = wasPending
+              ? Math.max(0, d.stats.externalCredit - invoice.total)
+              : d.stats.externalCredit
+            return {
+              ...d,
+              invoices: d.invoices.map(inv =>
+                inv.id === invoiceId
+                  ? { ...inv, status: 'draft' as const, voidReason: reason, voidedAt: new Date().toISOString().slice(0, 10) }
+                  : inv
+              ),
+              stats: { ...d.stats, totalSales, totalPurchases, externalCredit: Math.max(0, externalCredit) },
+            }
+          }),
+        }))
+
+        if (isSupabaseConfigured()) {
+          await supabase.from('delegate_invoices').update({
+            status: 'draft',
+            void_reason: reason,
+            voided_at: new Date().toISOString().slice(0, 10),
+          }).eq('id', invoiceId)
+        }
       },
     }),
     { name: 'sahl-delegates-v4' }

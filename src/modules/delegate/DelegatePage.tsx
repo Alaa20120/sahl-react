@@ -13,9 +13,12 @@ import { useInventoryStore } from '@/store/inventory.store'
 import { PRODUCTS } from '@/lib/mock-data/inventory'
 
 const INV_STATUS: Record<string, { label: string; css: string }> = {
-  paid:    { label: 'مدفوعة',  css: 'status-active' },
-  pending: { label: 'معلقة',   css: 'status-pending' },
-  overdue: { label: 'متأخرة',  css: 'status-inactive' },
+  paid:      { label: 'مدفوعة',  css: 'status-active' },
+  pending:   { label: 'معلقة',   css: 'status-pending' },
+  overdue:   { label: 'متأخرة',  css: 'status-inactive' },
+  confirmed: { label: 'مؤكدة',   css: 'status-active' },
+  draft:     { label: 'مسودة',   css: 'status-pending' },
+  cancelled: { label: 'ملغاة',   css: 'status-inactive' },
 }
 
 export default function DelegatePage() {

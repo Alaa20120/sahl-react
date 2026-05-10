@@ -356,9 +356,17 @@ export default function InvoiceDetailPage() {
             <i className="fa fa-check" /> تأكيد الفاتورة وخصم المخزون
           </button>
         )}
-        {status !== 'paid' && status !== 'draft' && status !== 'pending' && !isVoided && (
-          <button className="btn btn-sm" style={{ background: 'var(--success)', color: '#fff', border: 'none' }} onClick={() => setShowPayment(true)}>
-            <i className="fa fa-coins" /> تسجيل دفعة
+        {/* زر السداد — للآجل فقط عند وجود مبلغ متبقي */}
+        {invoice.paymentMethod === 'credit' && status !== 'paid' && !isVoided && (
+          <button
+            className="btn btn-sm"
+            style={{ background: 'var(--success)', color: '#fff', border: 'none', fontWeight: 700 }}
+            onClick={() => setShowPayment(true)}
+          >
+            <i className="fa fa-hand-holding-dollar" /> سداد الآجل
+            <span style={{ marginRight: 6, opacity: .8, fontSize: 11 }}>
+              ({fmt(invoice.total - (invoice.paidAmount || 0))})
+            </span>
           </button>
         )}
         {!isVoided && (

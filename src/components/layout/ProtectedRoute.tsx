@@ -4,7 +4,17 @@ import { useAuthStore } from '@/store/auth.store'
 export default function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const user = useAuthStore(s => s.user)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const hasHydrated = useAuthStore(s => s.hasHydrated)
   const location = useLocation()
+
+  if (!hasHydrated) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--muted)', fontSize: 14, gap: 12 }}>
+        <i className="fa fa-spinner fa-spin" style={{ fontSize: 20 }} />
+        جارٍ التحميل...
+      </div>
+    )
+  }
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/" state={{ from: location }} replace />

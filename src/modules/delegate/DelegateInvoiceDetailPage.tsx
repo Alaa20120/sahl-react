@@ -17,6 +17,8 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   pending: { label: 'معلقة',   color: 'var(--warn)',    bg: 'rgba(234,179,8,.1)' },
   overdue: { label: 'متأخرة',  color: 'var(--danger)',  bg: 'var(--danger-bg)' },
   confirmed: { label: 'مؤكدة', color: 'var(--success)', bg: 'var(--success-bg)' },
+  draft:   { label: 'مسودة',   color: 'var(--muted)',   bg: 'var(--bg)' },
+  cancelled:{ label: 'ملغاة',  color: 'var(--danger)',  bg: 'var(--danger-bg)' },
 }
 
 export default function DelegateInvoiceDetailPage() {
@@ -36,6 +38,7 @@ export default function DelegateInvoiceDetailPage() {
   const isMobile = useIsMobile()
   const delegate = useMemo(() => delegates.find(d => d.id === delegateId), [delegates, delegateId])
   const invoice = useMemo(() => delegate?.invoices.find(inv => inv.id === id), [delegate, id])
+  const voidDelegateInvoice = useDelegateStore(s => s.voidDelegateInvoice)
 
   const [payAmount, setPayAmount] = useState('')
   const [showPayForm, setShowPayForm] = useState(false)
@@ -357,6 +360,18 @@ export default function DelegateInvoiceDetailPage() {
               {invoice.paymentMethod === 'credit' && remaining > 0 && !showPayForm && (
                 <button className="btn btn-sm w-full" style={{ justifyContent: 'center', background: 'var(--success)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }} onClick={() => setShowPayForm(true)}>
                   <i className="fa fa-coins" /> تسديد دفعة
+                </button>
+              )}
+              {/* Void/return invoice button */}
+              {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
+                <button className="btn btn-sm w-full" style={{ justifyContent: 'center', background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }} onClick={() => {
+                  if (confirm('هل أنت متأكد من استرجاع/إلغاء هذه الفاتورة؟ سيتم إرجاع المخزون واستعادة رصيد العميل.')) {
+                    voidDelegateInvoice(delegateId, invoice.id, 'استرجاع من صفحة المندوب')
+                    toast('تم استرجاع الفاتورة وتحويلها لمسودة ✅', 'success')
+                    navigate('/delegate/invoices')
+                  }
+                }}>
+                  <i className="fa fa-rotate-left" /> استرجاع الفاتورة
                 </button>
               )}
               <button className="btn btn-outline btn-sm w-full" style={{ justifyContent: 'center' }} onClick={() => navigate('/delegate/invoices')}>

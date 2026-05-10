@@ -42,9 +42,11 @@ export interface DelegateInvoice {
   tax: number
   total: number
   paidAmount?: number
-  status: 'paid' | 'pending' | 'overdue' | 'confirmed'
+  status: 'paid' | 'pending' | 'overdue' | 'confirmed' | 'draft' | 'cancelled'
   paymentMethod?: 'cash' | 'credit'
   confirmedAt?: string
+  voidReason?: string
+  voidedAt?: string
 }
 
 export interface DelegateTransaction {

@@ -18,6 +18,7 @@ interface AuthState {
   user: AuthUser | null
   isAuthenticated: boolean
   loading: boolean
+  hasHydrated: boolean
   login: (user: AuthUser) => void
   logout: () => void
   fetchUser: () => Promise<void>
@@ -30,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       loading: false,
+      hasHydrated: false,
 
       login(user) {
         set({ user, isAuthenticated: true, loading: false })
@@ -50,6 +52,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'sahl-auth',
+      onRehydrateStorage: () => (state, error) => {
+        if (!error) {
+          useAuthStore.setState({ hasHydrated: true })
+        }
+      },
     }
   )
 )

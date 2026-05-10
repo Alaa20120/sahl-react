@@ -14,6 +14,8 @@ const INV_STATUS: Record<string, { label: string; css: string }> = {
   confirmed: { label: 'مؤكدة',    css: 'status-active' },
   pending:   { label: 'معلقة',    css: 'status-pending' },
   overdue:   { label: 'متأخرة',   css: 'status-inactive' },
+  draft:     { label: 'مسودة',    css: 'status-pending' },
+  cancelled: { label: 'ملغاة',    css: 'status-inactive' },
 }
 
 export default function DelegateInvoicesPage() {

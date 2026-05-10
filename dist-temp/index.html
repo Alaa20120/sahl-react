@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <meta name="theme-color" content="#0D1117" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="سهل" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="description" content="نظام ERP عربي متكامل لإدارة الفواتير والمخزون والموارد البشرية" />
+    <meta name="application-name" content="سهل ERP" />
+    <title>سهل — نظام ERP عربي متكامل</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <!-- GitHub Pages SPA redirect handler -->
+    <script>
+      (function(l){
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s){
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location))
+    </script>
+    <script type="module" crossorigin src="/assets/index-QLgi7hlS.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/jsx-runtime-BE_tW6Ee.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-CP-sbJXJ.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CVJyf4Q0.css">
+  <script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('SW registered:', reg.scope))
+            .catch((err) => console.log('SW registration failed:', err))
+        })
+      }
+    </script>
+  </body>
+</html>

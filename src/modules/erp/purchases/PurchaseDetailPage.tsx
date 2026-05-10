@@ -204,7 +204,9 @@ export default function PurchaseDetailPage() {
   const purchases = usePurchaseStore(s => s.purchases)
   const storeAddPayment = usePurchaseStore(s => s.addPayment)
   const confirmReceipt = usePurchaseStore(s => s.confirmReceipt)
+  const storeUpdateStatus = usePurchaseStore(s => s.updateStatus)
   const addStock = useInventoryStore(s => s.addStock)
+  const deductStock = useInventoryStore(s => s.deductStock)
   const po = purchases.find(p => p.id === id)
 
   const [template, setTemplate]       = useState<TplId>(getTemplate)
@@ -212,8 +214,11 @@ export default function PurchaseDetailPage() {
   const [showVoid, setShowVoid]       = useState(false)
   const [payAmount, setPayAmount]     = useState('')
   const [payMethod, setPayMethod]     = useState<'cash' | 'bank' | 'card'>('bank')
-  const [status, setStatus]           = useState<PurchaseStatus>(po?.status ?? 'pending')
-  const [isVoided, setIsVoided]       = useState(false)
+  // Derive status from store — persists across refresh
+  const status = po?.status ?? 'pending'
+  const isVoided = status === 'voided'
+  const [, setIsVoided] = useState(false) // kept for compatibility
+  const [, setStatus] = useState<PurchaseStatus>('pending') // kept for compatibility
   const [voidReason, setVoidReason]   = useState('')
 
   if (!po) {
@@ -253,11 +258,22 @@ export default function PurchaseDetailPage() {
     toast('تم تأكيد الاستلام وإضافة الكميات للمخزون', 'success')
   }
 
-  const handleVoid = () => {
+  const handleVoid = async () => {
     if (!voidReason.trim()) { toast('يرجى إدخال سبب الاسترجاع', 'warn'); return }
-    setIsVoided(true)
-    setStatus('voided')
-    toast(`تم استرجاع أمر الشراء ${po.number || po.id}`, 'success')
+
+    // 1. Update status in Supabase + local store
+    await storeUpdateStatus(po.id, 'voided')
+
+    // 2. If purchase was received, deduct stock back (reverse the addition)
+    if (status === 'received' || status === 'partial') {
+      for (const item of po.lineItems) {
+        if (item.productId && item.qty > 0) {
+          await deductStock(item.productId, item.qty)
+        }
+      }
+    }
+
+    toast(`تم استرجاع أمر الشراء ${po.number || po.id} وعكس المخزون ✅`, 'success')
     setShowVoid(false)
   }
 

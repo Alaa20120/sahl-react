@@ -38,15 +38,13 @@
 
 .hidden { display: none !important; }
 
-html { direction: rtl; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+html { direction: rtl; }
 body {
   font-family: 'Tajawal', 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   font-size: 14px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -176,6 +174,9 @@ input, select, textarea { font-family: inherit; }
   padding: 28px;
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  height: calc(100vh - 56px);
+  -webkit-overflow-scrolling: touch;
 }
 .page-header { margin-bottom: 24px; }
 .page-header-actions {
@@ -584,6 +585,9 @@ tbody tr:hover td { background: #FAFBFC; }
     padding-bottom: 80px;
     width: 100%;
     box-sizing: border-box;
+    overflow-y: auto;
+    height: calc(100vh - 52px);
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Page header stack vertically */

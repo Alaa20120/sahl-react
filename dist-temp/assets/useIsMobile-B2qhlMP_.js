@@ -1,0 +1,1 @@
+import{i as e}from"./jsx-runtime-BE_tW6Ee.js";import{D as t}from"./index-QLgi7hlS.js";var n=e(t(),1);function r(e=768){let[t,r]=(0,n.useState)(window.innerWidth<=e);return(0,n.useEffect)(()=>{let t=()=>r(window.innerWidth<=e);return window.addEventListener(`resize`,t),()=>window.removeEventListener(`resize`,t)},[e]),t}export{r as t};

@@ -1,0 +1,1 @@
+import{i as e}from"./jsx-runtime-BE_tW6Ee.js";import{D as t}from"./index-QLgi7hlS.js";var n=e(t(),1);function r(){let[e,t]=(0,n.useState)(!1),r=(0,n.useRef)(!1);async function i(e){if(!r.current){r.current=!0,t(!0);try{return await e()}finally{r.current=!1,t(!1)}}}return{saving:e,run:i}}export{r as t};

@@ -168,7 +168,7 @@ export default function InventoryPage() {
         }
       />
 
-      <div className="stats-grid mb-6">
+      <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
         <StatCard label="إجمالي الأصناف" value={fmtNum(products.length)} dark icon="fa-box" />
         <StatCard label="قيمة المخزون" value={fmt(totalValue)} icon="fa-coins" iconColor="var(--success)" />
         <StatCard label="أصناف منخفضة" value={String(lowStock.length)} badge="تنبيه" badgeType="danger" icon="fa-exclamation-triangle" iconColor="var(--danger)" />

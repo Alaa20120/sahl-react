@@ -174,9 +174,7 @@ input, select, textarea { font-family: inherit; }
   padding: 28px;
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
-  height: calc(100vh - 56px);
-  -webkit-overflow-scrolling: touch;
+  min-height: calc(100vh - 56px);
 }
 .page-header { margin-bottom: 24px; }
 .page-header-actions {

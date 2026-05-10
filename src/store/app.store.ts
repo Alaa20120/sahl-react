@@ -68,6 +68,6 @@ export const useAppStore = create<AppState>()(
       setBranch: (branch) => set({ branch }),
       setInvoiceNotes: (invoiceNotes) => set({ invoiceNotes }),
     }),
-    { name: 'sahl-app-v2' }
+    { name: 'sahl-app-v6' }
   )
 )

@@ -95,6 +95,6 @@ export const useHRStore = create<HRStore>()(
         }))
       },
     }),
-    { name: 'sahl-hr-v1' }
+    { name: 'sahl-hr-v6' }
   )
 )

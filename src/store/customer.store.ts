@@ -176,6 +176,6 @@ export const useCustomerStore = create<CustomerStore>()(
         return get().payments.filter(p => p.customerId === customerId)
       },
     }),
-    { name: 'sahl-customers-v3' }
+    { name: 'sahl-customers-v6' }
   )
 )

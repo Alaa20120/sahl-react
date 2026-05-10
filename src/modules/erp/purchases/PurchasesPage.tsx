@@ -197,7 +197,7 @@ export default function PurchasesPage() {
                 { header: 'المدفوع', key: 'paid', width: 18, type: 'currency' },
                 { header: 'الحالة', key: 'status', width: 14, type: 'status', align: 'center' },
               ],
-              rows: filtered as unknown as Record<string, unknown>[],
+              rows: filtered.map(p => ({ ...p as unknown as Record<string,unknown>, id: p.number || p.id })) as unknown as Record<string, unknown>[],
               totals: { id: '', supplier: `${filtered.length} أمر`, total: filtered.reduce((s, p) => s + p.total, 0), paid: filtered.reduce((s, p) => s + p.paid, 0) },
             })}>
               <i className="fa fa-file-excel" /> تصدير Excel
@@ -254,7 +254,7 @@ export default function PurchasesPage() {
                 <tr key={po.id}>
                   <td><input type="checkbox" checked={selected.includes(po.id)} onChange={() => toggleSelect(po.id)} /></td>
                   <td>
-                    <Link to={`/erp/purchases/${po.id}`} style={{ color: 'var(--blue)', fontWeight: 700 }}>{po.id}</Link>
+                    <Link to={`/erp/purchases/${po.id}`} style={{ color: 'var(--blue)', fontWeight: 700 }}>{po.number || po.id}</Link>
                   </td>
                   <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(new Date(po.date))}</td>
                   <td>

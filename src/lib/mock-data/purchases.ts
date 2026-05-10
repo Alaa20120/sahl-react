@@ -10,6 +10,7 @@ export interface PurchaseItem {
 
 export interface Purchase {
   id: string
+  number: string
   date: string
   dueDate?: string
   supplier: string

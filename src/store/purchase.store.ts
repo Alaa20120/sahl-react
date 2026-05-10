@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { PURCHASES, type Purchase, type PurchaseStatus } from '@/lib/mock-data/purchases'
 import { useInventoryStore } from './inventory.store'
+import { useCustomerStore } from './customer.store'
 
 interface PurchaseStore {
   purchases: Purchase[]
@@ -42,6 +43,7 @@ export const usePurchaseStore = create<PurchaseStore>()(
           }
           const mapped = (purchasesData || []).map((p: any): Purchase => ({
             id: p.id,
+            number: p.number || p.id,
             date: p.date,
             dueDate: p.due_date || undefined,
             supplier: p.supplier,
@@ -93,7 +95,8 @@ export const usePurchaseStore = create<PurchaseStore>()(
         }
 
         counters[year] = n
-        const purchase: Purchase = { ...data, id: `${prefix}${String(n).padStart(3,'0')}` }
+        const number = `${prefix}${String(n).padStart(3,'0')}`
+        const purchase: Purchase = { ...data, id: number, number }
 
         if (isSupabaseConfigured()) {
           const result = await supaFetch('purchases', {
@@ -140,6 +143,13 @@ export const usePurchaseStore = create<PurchaseStore>()(
           }
         }
 
+        // Update supplier balance (increase — we owe them)
+        const customerStore = useCustomerStore.getState()
+        const supplier = customerStore.customers.find(c => c.name === data.supplier || c.id === (data as any).supplierId)
+        if (supplier) {
+          customerStore.updateBalance(supplier.id, data.total)
+        }
+
         set(state => ({ purchases: [purchase, ...state.purchases], yearCounters: counters }))
         return purchase
       },
@@ -152,7 +162,7 @@ export const usePurchaseStore = create<PurchaseStore>()(
       },
 
       async addPayment(id, amount) {
-        const purchase = get().purchases.find(p => p.id === id)
+        const purchase = get().purchases.find(p => p.id === id || p.number === id)
         if (!purchase) return
         const newPaid = purchase.paid + amount
         const newStatus: PurchaseStatus = newPaid >= purchase.total ? 'received' : 'partial'
@@ -173,14 +183,21 @@ export const usePurchaseStore = create<PurchaseStore>()(
             },
           })
         }
-        set(state => ({ purchases: state.purchases.map(p => p.id === id ? { ...p, paid: newPaid, status: newStatus } : p) }))
+        // Decrease supplier balance when we pay
+        const customerStore = useCustomerStore.getState()
+        const supplier = customerStore.customers.find(c => c.name === purchase.supplier)
+        if (supplier) {
+          customerStore.updateBalance(supplier.id, -amount)
+        }
+
+        set(state => ({ purchases: state.purchases.map(p => p.id === id || p.number === id ? { ...p, paid: newPaid, status: newStatus } : p) }))
       },
 
       async confirmReceipt(id) {
         if (isSupabaseConfigured()) {
           await supaFetch('purchases', { method: 'PATCH', filter: 'id=eq.' + id, body: { status: 'received' } })
           // Add to stock when confirmed as received
-          const purchase = get().purchases.find(p => p.id === id)
+          const purchase = get().purchases.find(p => p.id === id || p.number === id)
           if (purchase && purchase.status !== 'received') {
             for (const item of purchase.lineItems) {
               if (item.productId) {
@@ -189,7 +206,7 @@ export const usePurchaseStore = create<PurchaseStore>()(
             }
           }
         }
-        set(state => ({ purchases: state.purchases.map(p => p.id === id ? { ...p, status: 'received' as PurchaseStatus } : p) }))
+        set(state => ({ purchases: state.purchases.map(p => p.id === id || p.number === id ? { ...p, status: 'received' as PurchaseStatus } : p) }))
       },
     }),
     { name: 'sahl-purchases-v3' }

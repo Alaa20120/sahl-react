@@ -52,7 +52,7 @@ function openPrintWindow(
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>أمر شراء ${po.id}</title>
+<title>أمر شراء ${po.number || po.id}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Tajawal',Arial,sans-serif;font-size:13px;background:#F8FAFC;color:#111827;direction:rtl}
@@ -104,7 +104,7 @@ ${isVoided ? '<div class="voided-stamp">مسترجع — VOIDED</div>' : ''}
       <div class="po-title">أمر شراء</div>
       <div class="po-title-sub">PURCHASE ORDER</div>
       <div class="po-meta">
-        <div><strong style="opacity:.6;font-weight:600">رقم الأمر:</strong> ${po.id}</div>
+        <div><strong style="opacity:.6;font-weight:600">رقم الأمر:</strong> ${po.number || po.id}</div>
         <div><strong style="opacity:.6;font-weight:600">تاريخ الإصدار:</strong> ${po.date}</div>
         ${po.dueDate ? `<div><strong style="opacity:.6;font-weight:600">تاريخ الاستحقاق:</strong> ${po.dueDate}</div>` : ''}
         <div><strong style="opacity:.6;font-weight:600">الحالة:</strong> ${STATUS_LABELS[status]}${isVoided ? ' — مسترجع' : ''}</div>
@@ -252,7 +252,7 @@ export default function PurchaseDetailPage() {
     if (!voidReason.trim()) { toast('يرجى إدخال سبب الاسترجاع', 'warn'); return }
     setIsVoided(true)
     setStatus('voided')
-    toast(`تم استرجاع أمر الشراء ${po.id}`, 'success')
+    toast(`تم استرجاع أمر الشراء ${po.number || po.id}`, 'success')
     setShowVoid(false)
   }
 
@@ -387,7 +387,7 @@ export default function PurchaseDetailPage() {
               <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>أمر شراء</div>
               <div style={{ fontSize: 12, opacity: .65, marginTop: 2 }}>PURCHASE ORDER</div>
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: 2, opacity: .9 }}>
-                <div><strong style={{ opacity: .6, fontWeight: 600 }}>رقم الأمر:</strong> {po.id}</div>
+                <div><strong style={{ opacity: .6, fontWeight: 600 }}>رقم الأمر:</strong> {po.number || po.id}</div>
                 <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الإصدار:</strong> {fmtDate(new Date(po.date))}</div>
                 {po.dueDate && <div><strong style={{ opacity: .6, fontWeight: 600 }}>تاريخ الاستحقاق:</strong> {fmtDate(new Date(po.dueDate))}</div>}
               </div>
@@ -572,14 +572,14 @@ export default function PurchaseDetailPage() {
             <div>
               <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 4 }}>تحذير: لا يمكن التراجع عن الاسترجاع</div>
               <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
-                سيتم إلغاء الأمر {po.id} وتصنيفه كمسترجع. لن يمكن إجراء أي تعديلات أو دفعات عليه.
+                سيتم إلغاء الأمر {po.number || po.id} وتصنيفه كمسترجع. لن يمكن إجراء أي تعديلات أو دفعات عليه.
               </div>
             </div>
           </div>
 
           <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', display: 'flex', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>رقم الأمر</div>
-            <div style={{ fontWeight: 700 }}>{po.id}</div>
+            <div style={{ fontWeight: 700 }}>{po.number || po.id}</div>
           </div>
           <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', display: 'flex', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>الإجمالي</div>

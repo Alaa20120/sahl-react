@@ -270,23 +270,28 @@ export const useInvoiceStore = create<InvoiceStore>()(
               })),
             })
           }
-          for (const item of returnedItems) {
-            if (item.productId) await useInventoryStore.getState().addStock(item.productId, item.qty, `return_${returnNumber}`)
-          }
-          if (original.customerId) await useCustomerStore.getState().updateBalance(original.customerId, -returnTotal)
-          // Treasury: record refund as outgoing
-          await useTreasuryStore.getState().addTransaction({
-            date: returnInvoice.date,
-            description: `مرتجع فاتورة ${original.number} - ${original.customer}`,
-            type: 'out',
-            category: 'invoice',
-            amount: returnTotal,
-            account: 'cash',
-            ref: returnNumber,
-          })
         }
 
-        set(state => ({ invoices: [returnInvoice, ...state.invoices] }))
+        // Restore stock regardless of Supabase
+        for (const item of returnedItems) {
+          if (item.productId) await useInventoryStore.getState().addStock(item.productId, item.qty, `return_${returnNumber}`)
+        }
+        // Deduct from customer balance
+        if (original.customerId) await useCustomerStore.getState().updateBalance(original.customerId, -returnTotal)
+        // Treasury: record refund as outgoing
+        await useTreasuryStore.getState().addTransaction({
+          date: returnInvoice.date,
+          description: `مرتجع فاتورة ${original.number} - ${original.customer}`,
+          type: 'out',
+          category: 'invoice',
+          amount: returnTotal,
+          account: 'cash',
+          ref: returnNumber,
+        })
+
+        // Mark original invoice as returned
+        const updatedInvoices = state.invoices.map(inv => inv.id === originalInvoiceId ? { ...inv, status: 'returned' as const } : inv)
+        set(state => ({ invoices: [returnInvoice, ...updatedInvoices] }))
         return returnInvoice
       },
     }),

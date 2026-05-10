@@ -205,7 +205,7 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
 export default function InvoiceDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { invoices, addPayment, updateStatus, confirmInvoice } = useInvoiceStore()
+  const { invoices, addPayment, updateStatus, confirmInvoice, createReturn } = useInvoiceStore()
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
   const { updateBalance: updateCustomerBalance } = useCustomerStore()
   const co = useAppStore(s => s.company)
@@ -264,11 +264,11 @@ export default function InvoiceDetailPage() {
     setShowSend(false)
   }
 
-  const handleVoid = () => {
+  const handleVoid = async () => {
     if (!voidReason.trim()) { toast('يرجى إدخال سبب الاسترجاع', 'warn'); return }
+    await createReturn(invoice.id, invoice.items, voidReason)
     setIsVoided(true)
-    updateStatus(invoice.id, 'draft')
-    toast(`تم استرجاع الفاتورة ${invoice.number}`, 'success')
+    toast(`تم استرجاع الفاتورة ${invoice.number} وإعادة الكميات للمخزون وتحديث رصيد العميل`, 'success')
     setShowVoid(false)
   }
 

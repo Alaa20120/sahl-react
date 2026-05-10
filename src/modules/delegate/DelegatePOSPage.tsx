@@ -135,9 +135,9 @@ export default function DelegatePOSPage() {
     setCart(prev => prev.filter(item => item.productId !== productId))
   }
 
-  const subtotal = cart.reduce((s, item) => s + item.price * item.qty, 0)
-  const tax = subtotal * 0.15
-  const total = subtotal + tax
+  const total = cart.reduce((s, item) => s + item.price * item.qty, 0)
+  const tax = Math.round(total * 15 / 115 * 100) / 100
+  const subtotal = Math.round((total - tax) * 100) / 100
 
   async function handleAddCustomerSubmit() {
     if (!newCustomerName.trim()) { toast('أدخل اسم العميل', 'warn'); return }

@@ -125,9 +125,9 @@ export default function PurchasesPage() {
   const selectProduct = (id: number, product: Product) =>
     setItems(prev => prev.map(i => i.id === id ? { ...i, productId: product.id, desc: product.name, price: String(product.costPrice) } : i))
 
-  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty)||0) * (parseFloat(i.price)||0), 0)
-  const tax = subtotal * VAT
-  const total = subtotal + tax
+  const total = items.reduce((s, i) => s + (parseFloat(i.qty)||0) * (parseFloat(i.price)||0), 0)
+  const tax = Math.round(total * VAT / (1 + VAT) * 100) / 100
+  const subtotal = Math.round((total - tax) * 100) / 100
 
   const resetForm = () => {
     setItems([{ id: 1, desc: '', qty: '1', price: '' }])
@@ -438,19 +438,19 @@ export default function PurchasesPage() {
               <i className="fa fa-plus" /> إضافة صنف
             </button>
 
-            {subtotal > 0 && (
+            {total > 0 && (
               <div style={{ marginTop: 12, background: 'var(--bg)', borderRadius: 8, padding: '10px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--muted)' }}>قبل الضريبة</span>
-                  <span style={{ fontWeight: 600 }}>{fmt(subtotal)}</span>
+                  <span style={{ color: 'var(--muted)' }}>الإجمالي شامل الضريبة</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(total)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--muted)' }}>ضريبة 15%</span>
+                  <span style={{ color: 'var(--muted)' }}>ضريبة 15% مستخرجة</span>
                   <span style={{ fontWeight: 600, color: 'var(--warn)' }}>{fmt(tax)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 800 }}>
-                  <span>الإجمالي</span>
-                  <span style={{ color: 'var(--primary)' }}>{fmt(total)}</span>
+                  <span>صافي قبل الضريبة</span>
+                  <span style={{ color: 'var(--primary)' }}>{fmt(subtotal)}</span>
                 </div>
               </div>
             )}

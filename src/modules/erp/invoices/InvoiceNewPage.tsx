@@ -120,7 +120,7 @@ function ProductPicker({
   )
 }
 
-import { calculateTax } from '@/lib/vat'
+import { extractTaxFromTotal } from '@/lib/vat'
 
 export default function InvoiceNewPage() {
   const navigate = useNavigate()
@@ -155,10 +155,10 @@ export default function InvoiceNewPage() {
   const selectProduct = (id: number, product: Product) =>
     setItems(prev => prev.map(i => i.id === id ? { ...i, productId: product.id, desc: product.name, price: String(product.sellPrice) } : i))
 
-  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.price) || 0), 0)
-  const taxBreakdown = calculateTax(subtotal)
+  const total = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.price) || 0), 0)
+  const taxBreakdown = extractTaxFromTotal(total)
   const tax = taxBreakdown.tax
-  const total = taxBreakdown.total
+  const subtotal = taxBreakdown.subtotal
 
   const handleSave = async (asDraft = false) => {
     const hasEmpty = items.some(i => !i.desc || !(parseFloat(i.price) > 0))
@@ -410,17 +410,17 @@ export default function InvoiceNewPage() {
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, color: 'var(--muted)' }}>ملخص الفاتورة</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--muted)' }}>المجموع قبل الضريبة</span>
-                <span style={{ fontWeight: 600 }}>{fmt(subtotal)}</span>
+                <span style={{ color: 'var(--muted)' }}>الإجمالي شامل الضريبة</span>
+                <span style={{ fontWeight: 600 }}>{fmt(total)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--muted)' }}>ضريبة القيمة المضافة (15%)</span>
+                <span style={{ color: 'var(--muted)' }}>ضريبة القيمة المضافة المستخرجة (15%)</span>
                 <span style={{ fontWeight: 600, color: 'var(--warn)' }}>{fmt(tax)}</span>
               </div>
               <div style={{ height: 1, background: 'var(--border)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
-                <span>الإجمالي</span>
-                <span style={{ color: 'var(--primary)' }}>{fmt(total)}</span>
+                <span>المجموع قبل الضريبة</span>
+                <span style={{ color: 'var(--primary)' }}>{fmt(subtotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginTop: 4 }}>
                 <span style={{ color: 'var(--muted)' }}>طريقة الدفع</span>

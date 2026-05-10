@@ -537,10 +537,10 @@ tbody tr:hover td { background: #FAFBFC; }
 @media (max-width: 768px) {
   /* Sidebar becomes a drawer - slides from RIGHT (RTL) */
   .sidebar {
-    transform: translateX(100%);
-    transition: transform .3s ease;
+    transform: none;
+    right: -280px;
+    transition: right .3s ease;
     width: 280px;
-    right: 0;
     left: auto;
     top: 0;
     bottom: 0;
@@ -550,7 +550,7 @@ tbody tr:hover td { background: #FAFBFC; }
     z-index: 999;
   }
   .sidebar.open {
-    transform: translateX(0);
+    right: 0;
   }
   .sidebar-overlay {
     position: fixed;
@@ -745,6 +745,7 @@ tbody tr:hover td { background: #FAFBFC; }
 .mobile-only { display: none !important; }
 @media (max-width: 768px) {
   .mobile-only { display: flex !important; }
+  .hidden-mobile { display: none !important; }
 
   /* POS: stack products above cart on mobile */
   #pos-mobile-tabs { display: flex !important; }
@@ -899,12 +900,12 @@ tbody tr:hover td { background: #FAFBFC; }
 @media (max-width: 480px) {
   /* 1 column on very small screens */
   .stats-grid {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: 1fr !important;
   }
   [style*="repeat(3"],
   [style*="repeat(4"],
   [style*="repeat(5"] {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: 1fr !important;
   }
 }
 

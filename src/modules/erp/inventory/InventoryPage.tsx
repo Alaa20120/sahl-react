@@ -320,16 +320,16 @@ export default function InventoryPage() {
                     title="تحديد الكل"
                   />
                 </th>
-                <th>الكود</th>
+                <th className="hidden-mobile">الكود</th>
                 <th>الصنف</th>
                 <th>الفئة</th>
-                <th>الوحدة</th>
+                <th className="hidden-mobile">الوحدة</th>
                 <th>سعر الشراء</th>
                 <th>سعر البيع</th>
                 <th>المخزون</th>
-                <th>الحد الأدنى</th>
+                <th className="hidden-mobile">الحد الأدنى</th>
                 <th>القيمة</th>
-                <th>الحالة</th>
+                <th className="hidden-mobile">الحالة</th>
                 <th>إجراءات</th>
               </tr>
             </thead>
@@ -354,7 +354,7 @@ export default function InventoryPage() {
                         />
                       )}
                     </td>
-                    <td style={{ fontFamily: 'monospace', color: 'var(--muted)', fontSize: 12 }}>{p.sku}</td>
+                    <td className="hidden-mobile" style={{ fontFamily: 'monospace', color: 'var(--muted)', fontSize: 12 }}>{p.sku}</td>
                     <td>
                       <button
                         style={{ fontWeight: 600, background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontSize: 13, padding: 0, textAlign: 'right' }}
@@ -373,7 +373,7 @@ export default function InventoryPage() {
                         {p.category}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--muted)' }}>{p.unit}</td>
+                    <td className="hidden-mobile" style={{ color: 'var(--muted)' }}>{p.unit}</td>
                     <td>{fmt(p.costPrice)}</td>
                     <td style={{ fontWeight: 700 }}>{fmt(p.sellPrice)}</td>
                     <td>
@@ -382,9 +382,9 @@ export default function InventoryPage() {
                         {isLow && <i className="fa fa-exclamation-circle" style={{ marginRight: 4, fontSize: 11 }} />}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--muted)' }}>{fmtNum(p.minStock)}</td>
+                    <td className="hidden-mobile" style={{ color: 'var(--muted)' }}>{fmtNum(p.minStock)}</td>
                     <td style={{ fontWeight: 700 }}>{fmt(p.stock * p.costPrice)}</td>
-                    <td>
+                    <td className="hidden-mobile">
                       <span className={`status ${p.status === 'active' ? 'status-active' : 'status-inactive'}`}>
                         {p.status === 'active' ? 'نشط' : 'غير نشط'}
                       </span>

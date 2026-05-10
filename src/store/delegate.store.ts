@@ -89,10 +89,12 @@ export const useDelegateStore = create<DelegateStore>()(
             itemsByInvoice[it.invoice_id].push(it)
           }
 
-          // Preserve locally confirmed/paid invoices so fetch() doesn't revert them
+          // Preserve local data so fetch() doesn't duplicate or revert it
           const currentDelegates = get().delegates
           const localInvoices = new Map<string, DelegateInvoice>()
+          const localWarehouses = new Map<string, DelegateWarehouseItem[]>()
           for (const d of currentDelegates) {
+            localWarehouses.set(d.id, d.warehouse)
             for (const inv of d.invoices) {
               if (inv.status === 'confirmed' || inv.status === 'paid') {
                 localInvoices.set(inv.id, inv)
@@ -100,17 +102,23 @@ export const useDelegateStore = create<DelegateStore>()(
             }
           }
 
-          const delegates = data.map((d: any): Delegate => ({
-            id: d.id, name: d.name, phone: d.phone || '', email: d.email || '',
-            zone: d.zone || '', status: d.status, username: d.username, password: d.password_hash,
-            avatar: d.avatar || d.name.split(' ').slice(0, 2).map((w: string) => w[0]).join(''),
-            location: { lat: d.location_lat || 24.7136, lng: d.location_lng || 46.6753, address: d.location_address || 'غير محدد', timestamp: new Date().toISOString() },
-            locationHistory: [],
-            warehouse: (whByDelegate[d.id] || []).map((w: any): DelegateWarehouseItem => ({
-              id: w.id, productId: w.product_id, productName: w.product_name, productSku: w.product_sku || '',
-              qty: w.qty, costPrice: Number(w.cost_price) || 0, receivedDate: w.received_date,
-              status: w.status, source: w.source,
-            })),
+          const delegates = data.map((d: any): Delegate => {
+            const localWh = localWarehouses.get(d.id)
+            // Use local warehouse if present (to avoid duplication from addToWarehouse + fetch race)
+            const warehouse = (localWh && localWh.length > 0)
+              ? localWh
+              : (whByDelegate[d.id] || []).map((w: any): DelegateWarehouseItem => ({
+                  id: w.id, productId: w.product_id, productName: w.product_name, productSku: w.product_sku || '',
+                  qty: w.qty, costPrice: Number(w.cost_price) || 0, receivedDate: w.received_date,
+                  status: w.status, source: w.source,
+                }))
+            return {
+              id: d.id, name: d.name, phone: d.phone || '', email: d.email || '',
+              zone: d.zone || '', status: d.status, username: d.username, password: d.password_hash,
+              avatar: d.avatar || d.name.split(' ').slice(0, 2).map((w: string) => w[0]).join(''),
+              location: { lat: d.location_lat || 24.7136, lng: d.location_lng || 46.6753, address: d.location_address || 'غير محدد', timestamp: new Date().toISOString() },
+              locationHistory: [],
+              warehouse,
             invoices: (invByDelegate[d.id] || []).map((i: any): DelegateInvoice => {
               const local = localInvoices.get(i.id)
               if (local && (local.status === 'confirmed' || local.status === 'paid')) {
@@ -144,8 +152,9 @@ export const useDelegateStore = create<DelegateStore>()(
               externalCredit: Number(d.stats_external_credit) || 0,
               expenses: Number(d.stats_expenses) || 0,
               companyEntrusted: Number(d.stats_company_entrusted) || 0,
-            },
-          }))
+            }
+          }
+          })
           set({ delegates, loading: false })
         } catch (e: any) {
           set({ error: e.message, loading: false })

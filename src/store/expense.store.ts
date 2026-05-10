@@ -113,6 +113,6 @@ export const useExpenseStore = create<ExpenseStore>()(
         return get().expenses.filter(e => e.status === 'approved' && e.date.startsWith(currentMonth)).reduce((s, e) => s + e.amount, 0)
       },
     }),
-    { name: 'sahl-expenses-v7' }
+    { name: 'sahl-expenses-v1' }
   )
 )

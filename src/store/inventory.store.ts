@@ -163,6 +163,6 @@ export const useInventoryStore = create<InventoryStore>()(
         }
       },
     }),
-    { name: 'sahl-inventory-v7' }
+    { name: 'sahl-inventory-v3' }
   )
 )

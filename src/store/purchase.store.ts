@@ -209,6 +209,6 @@ export const usePurchaseStore = create<PurchaseStore>()(
         set(state => ({ purchases: state.purchases.map(p => p.id === id || p.number === id ? { ...p, status: 'received' as PurchaseStatus } : p) }))
       },
     }),
-    { name: 'sahl-purchases-v7' }
+    { name: 'sahl-purchases-v3' }
   )
 )

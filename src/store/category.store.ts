@@ -48,6 +48,6 @@ export const useCategoryStore = create<CategoryStore>()(
         set(state => ({ categories: state.categories.filter(c => c !== name) }))
       },
     }),
-    { name: 'sahl-categories-v7' }
+    { name: 'sahl-categories-v2' }
   )
 )

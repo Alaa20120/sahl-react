@@ -176,6 +176,11 @@ input, select, textarea { font-family: inherit; }
   min-width: 0;
 }
 .page-header { margin-bottom: 24px; }
+.page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .page-title { font-size: 24px; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
 .page-subtitle { font-size: 13px; color: var(--muted); }
 
@@ -183,6 +188,7 @@ input, select, textarea { font-family: inherit; }
 .card {
   background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow);
+  overflow: hidden;
 }
 .card-body { padding: 20px; }
 .card-header {
@@ -240,8 +246,8 @@ input, select, textarea { font-family: inherit; }
 /* ─── TABLE ──────────────────────────────────────── */
 .table-wrap {
   overflow-x: auto;
-  overflow-y: visible; /* prevent trapping vertical page scroll */
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x; /* horizontal scroll inside table, vertical scroll passes to page */
 }
 table { width: 100%; border-collapse: collapse; }
 thead th {
@@ -834,6 +840,11 @@ tbody tr:hover td { background: #FAFBFC; }
   .stats-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+  .stat-value {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    font-size: 18px;
+  }
 
   /* Single col for very small content */
   [style*="repeat(1"] {
@@ -846,22 +857,16 @@ tbody tr:hover td { background: #FAFBFC; }
     flex-wrap: wrap;
   }
 
-  /* Make all tables scroll horizontally & vertically on mobile */
+  /* Make all tables scroll horizontally on mobile */
   .table-wrap {
     overflow-x: auto !important;
-    overflow-y: auto !important;
-    max-height: 60vh;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-2) transparent;
+    touch-action: pan-x;
   }
-  .table-wrap::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-  .table-wrap::-webkit-scrollbar-thumb {
-    background: var(--border-2);
-    border-radius: 4px;
+
+  /* Prevent any horizontal page overflow on mobile */
+  .main {
+    overflow-x: hidden;
   }
 
   /* Prevent any element from breaking viewport width */

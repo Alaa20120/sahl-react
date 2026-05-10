@@ -13,7 +13,7 @@ export default function PageHeader({ title, subtitle, actions }: Props) {
         <div className="page-title">{title}</div>
         {subtitle && <div className="page-subtitle">{subtitle}</div>}
       </div>
-      {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
+      {actions && <div className="page-header-actions">{actions}</div>}
     </div>
   )
 }

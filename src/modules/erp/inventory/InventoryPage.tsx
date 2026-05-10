@@ -177,9 +177,9 @@ export default function InventoryPage() {
 
       {showProfitability && (
         <div className="card mb-6">
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}><i className="fa fa-chart-bar" style={{ marginLeft: 8, color: 'var(--primary)' }} />ربحية المنتجات — مقارنة تكلفة الشراء بإيرادات البيع</span>
-            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--muted)' }}>
+            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--muted)', flexWrap: 'wrap' }}>
               <span>إجمالي الإيرادات: <strong style={{ color: 'var(--success)' }}>{fmt(_profitabilityData.reduce((s, r) => s + r.soldRevenue, 0))}</strong></span>
               <span>إجمالي التكلفة: <strong style={{ color: 'var(--danger)' }}>{fmt(_profitabilityData.reduce((s, r) => s + r.cogs, 0))}</strong></span>
               <span>صافي الربح: <strong style={{ color: 'var(--primary)' }}>{fmt(_profitabilityData.reduce((s, r) => s + r.grossProfit, 0))}</strong></span>
@@ -292,7 +292,7 @@ export default function InventoryPage() {
       <div className="card">
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
-          <div style={{ padding: '11px 20px', background: 'var(--pending-bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ padding: '11px 20px', background: 'var(--pending-bg)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <i className="fa fa-check-square" style={{ color: 'var(--pending)', fontSize: 16 }} />
             <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--pending)' }}>
               تم تحديد {selectedIds.size} {selectedIds.size === 1 ? 'منتج' : 'منتجات'}

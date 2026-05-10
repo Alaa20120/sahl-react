@@ -89,6 +89,17 @@ export const useDelegateStore = create<DelegateStore>()(
             itemsByInvoice[it.invoice_id].push(it)
           }
 
+          // Preserve locally confirmed/paid invoices so fetch() doesn't revert them
+          const currentDelegates = get().delegates
+          const localInvoices = new Map<string, DelegateInvoice>()
+          for (const d of currentDelegates) {
+            for (const inv of d.invoices) {
+              if (inv.status === 'confirmed' || inv.status === 'paid') {
+                localInvoices.set(inv.id, inv)
+              }
+            }
+          }
+
           const delegates = data.map((d: any): Delegate => ({
             id: d.id, name: d.name, phone: d.phone || '', email: d.email || '',
             zone: d.zone || '', status: d.status, username: d.username, password: d.password_hash,
@@ -100,20 +111,26 @@ export const useDelegateStore = create<DelegateStore>()(
               qty: w.qty, costPrice: Number(w.cost_price) || 0, receivedDate: w.received_date,
               status: w.status, source: w.source,
             })),
-            invoices: (invByDelegate[d.id] || []).map((i: any): DelegateInvoice => ({
-              id: i.id, number: i.number, date: i.date, type: i.type, party: i.party,
-              customerId: i.customer_id,
-              items: (itemsByInvoice[i.id] || []).map((it: any) => ({
-                productId: it.product_id || undefined,
-                description: it.description || '',
-                qty: Number(it.qty) || 0,
-                price: Number(it.price) || 0,
-                total: Number(it.total) || 0,
-              })),
-              subtotal: Number(i.subtotal) || 0, tax: Number(i.tax) || 0, total: Number(i.total) || 0,
-              paidAmount: Number(i.paid_amount) || 0, status: i.status,
-              paymentMethod: i.payment_method, confirmedAt: i.confirmed_at,
-            })),
+            invoices: (invByDelegate[d.id] || []).map((i: any): DelegateInvoice => {
+              const local = localInvoices.get(i.id)
+              if (local && (local.status === 'confirmed' || local.status === 'paid')) {
+                return local
+              }
+              return {
+                id: i.id, number: i.number, date: i.date, type: i.type, party: i.party,
+                customerId: i.customer_id,
+                items: (itemsByInvoice[i.id] || []).map((it: any) => ({
+                  productId: it.product_id || undefined,
+                  description: it.description || '',
+                  qty: Number(it.qty) || 0,
+                  price: Number(it.price) || 0,
+                  total: Number(it.total) || 0,
+                })),
+                subtotal: Number(i.subtotal) || 0, tax: Number(i.tax) || 0, total: Number(i.total) || 0,
+                paidAmount: Number(i.paid_amount) || 0, status: i.status,
+                paymentMethod: i.payment_method, confirmedAt: i.confirmed_at,
+              }
+            }),
             transactions: (txByDelegate[d.id] || []).map((t: any): DelegateTransaction => ({
               id: t.id, date: t.date, type: t.type, amount: Number(t.amount) || 0,
               description: t.description || '', reference: t.reference,

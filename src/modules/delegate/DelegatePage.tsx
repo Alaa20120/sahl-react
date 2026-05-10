@@ -173,10 +173,10 @@ export default function DelegatePage() {
       toast('أكمل بيانات جميع الأصناف', 'warn'); return
     }
 
-    // Prices are VAT-inclusive — extract 15% from total
-    const total = newItems.reduce((s, it) => s + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0), 0)
-    const tax = Math.round(total * 15 / 115 * 100) / 100
-    const subtotal = Math.round((total - tax) * 100) / 100
+    // Prices are VAT-exclusive — add 15% tax
+    const subtotal = newItems.reduce((s, it) => s + (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0), 0)
+    const tax = Math.round(subtotal * 0.15 * 100) / 100
+    const total = Math.round((subtotal + tax) * 100) / 100
 
     // For sales: invoice is pending until confirmed (warehouse deduction happens at confirmation)
     // For cash sales: treat as immediately confirmed (deduct warehouse now)
@@ -656,25 +656,25 @@ export default function DelegatePage() {
                 )}
               </div>
 
-              {/* Totals - VAT inclusive */}
+              {/* Totals - VAT added */}
               {(() => {
-                const _total = newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0)
-                const _tax = Math.round(_total * 15 / 115 * 100) / 100
-                const _net = Math.round((_total - _tax) * 100) / 100
+                const _subtotal = newItems.reduce((s, it) => s + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0)
+                const _tax = Math.round(_subtotal * 0.15 * 100) / 100
+                const _total = Math.round((_subtotal + _tax) * 100) / 100
                 return (
                   <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '16px 20px', marginBottom: 20 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                      <span style={{ color: 'var(--muted)' }}>الإجمالي شامل الضريبة</span>
-                      <span style={{ fontWeight: 700 }}>{fmt(_total)}</span>
+                      <span style={{ color: 'var(--muted)' }}>الإجمالي قبل الضريبة</span>
+                      <span style={{ fontWeight: 700 }}>{fmt(_subtotal)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                      <span style={{ color: 'var(--muted)' }}>ضريبة القيمة المضافة المستخرجة (15%)</span>
-                      <span style={{ fontWeight: 700, color: 'var(--warn)' }}>- {fmt(_tax)}</span>
+                      <span style={{ color: 'var(--muted)' }}>ضريبة القيمة المضافة (15%)</span>
+                      <span style={{ fontWeight: 700, color: 'var(--warn)' }}>+ {fmt(_tax)}</span>
                     </div>
                     <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
-                      <span>صافي قبل الضريبة</span>
-                      <span style={{ color: 'var(--primary)' }}>{fmt(_net)}</span>
+                      <span>الإجمالي بعد الضريبة</span>
+                      <span style={{ color: 'var(--primary)' }}>{fmt(_total)}</span>
                     </div>
                   </div>
                 )

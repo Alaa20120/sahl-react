@@ -82,7 +82,7 @@ export default function DelegatePage() {
     ? parties.filter((p: any) => p.name.includes(partySearch) || p.phone.includes(partySearch))
     : parties
 
-  // Available = sum of warehouse qty (already deducted after confirmation)
+  // Available = sum of warehouse qty minus confirmed/paid sales
   const availableProducts = newInvType === 'sale'
     ? (() => {
         const grouped: Record<string, any> = {}
@@ -101,6 +101,14 @@ export default function DelegatePage() {
             }
           }
           grouped[w.productId].whQty += w.qty
+        })
+        // Deduct confirmed/paid sales
+        delegateInvoices.filter((inv: any) => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid')).forEach((inv: any) => {
+          (inv.items || []).forEach((it: any) => {
+            if (it.productId && grouped[it.productId]) {
+              grouped[it.productId].whQty -= (it.qty || 0)
+            }
+          })
         })
         return Object.values(grouped).filter((p: any) => p.whQty > 0)
       })()

@@ -27,7 +27,8 @@ interface DelegateStore {
   deductFromWarehouse: (delegateId: string, productId: string, qty: number) => boolean
   addToWarehouse: (delegateId: string, item: Omit<DelegateWarehouseItem, 'id' | 'status'>) => Promise<void>
   withdrawFromDelegate: (delegateId: string, amount: number, description: string) => Promise<void>
-  transferToMainWarehouse: (delegateId: string, warehouseItemId: string, qty: number) => Promise<void>
+  getAggregatedWarehouse: (delegateId: string) => { productId: string; productName: string; productSku: string; received: number; sold: number; available: number }[]
+  transferToMainWarehouse: (delegateId: string, productId: string, qty: number) => Promise<void>
   remitToCompany: (delegateId: string, amount: number, description: string) => Promise<void>
   validateLogin: (username: string, password: string) => Delegate | null
 }
@@ -420,19 +421,57 @@ export const useDelegateStore = create<DelegateStore>()(
         }))
       },
 
-      async transferToMainWarehouse(delegateId, warehouseItemId, qty) {
-        const item = get().delegates.find(d => d.id === delegateId)?.warehouse.find(w => w.id === warehouseItemId)
-        if (isSupabaseConfigured() && item) {
-          await supabase.from('delegate_warehouse').update({ qty: item.qty - qty }).eq('id', warehouseItemId)
-          // Sync back to main inventory
-          if (item.productId) {
-            await useInventoryStore.getState().addStock(item.productId, qty, `delegate_return_${delegateId}`)
+      getAggregatedWarehouse(delegateId) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return []
+        const grouped: Record<string, { productId: string; productName: string; productSku: string; received: number; sold: number; available: number }> = {}
+        for (const item of delegate.warehouse) {
+          if (!grouped[item.productId]) {
+            grouped[item.productId] = { productId: item.productId, productName: item.productName, productSku: item.productSku, received: 0, sold: 0, available: 0 }
+          }
+          grouped[item.productId].received += item.qty
+        }
+        for (const inv of delegate.invoices) {
+          if (inv.type === 'sale' && inv.status === 'confirmed') {
+            for (const it of inv.items) {
+              if (it.productId && grouped[it.productId]) {
+                grouped[it.productId].sold += it.qty
+              }
+            }
           }
         }
+        for (const key in grouped) {
+          grouped[key].available = grouped[key].received - grouped[key].sold
+        }
+        return Object.values(grouped).filter(g => g.available > 0)
+      },
+
+      async transferToMainWarehouse(delegateId, productId, qty) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return
+        let remaining = qty
+        const itemsToUpdate = delegate.warehouse.filter(w => w.productId === productId && w.qty > 0)
+        for (const item of itemsToUpdate) {
+          if (remaining <= 0) break
+          const deduct = Math.min(remaining, item.qty)
+          remaining -= deduct
+          if (isSupabaseConfigured()) {
+            await supabase.from('delegate_warehouse').update({ qty: item.qty - deduct }).eq('id', item.id)
+          }
+        }
+        // Sync back to main inventory
+        await useInventoryStore.getState().addStock(productId, qty, `delegate_return_${delegateId}`)
         set(state => ({
           delegates: state.delegates.map(d => {
             if (d.id !== delegateId) return d
-            return { ...d, warehouse: d.warehouse.map(w => w.id !== warehouseItemId ? w : { ...w, qty: w.qty - qty }).filter(w => w.qty > 0) }
+            let rem = qty
+            const updatedWarehouse = d.warehouse.map(w => {
+              if (w.productId !== productId || rem <= 0) return w
+              const deduct = Math.min(rem, w.qty)
+              rem -= deduct
+              return { ...w, qty: w.qty - deduct }
+            }).filter(w => w.qty > 0)
+            return { ...d, warehouse: updatedWarehouse }
           }),
         }))
       },

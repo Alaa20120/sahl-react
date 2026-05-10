@@ -177,7 +177,7 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
           <div style="font-weight:700;color:#111827;margin-bottom:4px">ملاحظات:</div>
           <div>شكراً لتعاملكم معنا.</div>
           <div>يُرجى الدفع خلال 30 يوماً من تاريخ الفاتورة.</div>
-          <div style="margin-top:6px;font-size:11px">للاستفسار: info@sahl.sa | 0112345678</div>
+          <div style="margin-top:6px;font-size:11px">للاستفسار: ${co?.email || '—'} | ${co?.phone || '—'}</div>
           ${isVoided ? '<div style="margin-top:8px;color:#DC2626;font-weight:700">⚠ هذه الفاتورة مسترجعة وملغاة</div>' : ''}
         </div>
       </div>
@@ -190,7 +190,7 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
     </div>
 
     <div class="doc-footer">
-      <div>شركة سهل التقنية — السجل التجاري: 1234567890</div>
+      <div>${co?.name || '—'} — السجل التجاري: ${co?.cr || '—'}</div>
       <div>صفحة 1 من 1</div>
       <div>تم الإصدار بنظام سهل ERP</div>
     </div>
@@ -489,7 +489,7 @@ export default function InvoiceDetailPage() {
                   <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>ملاحظات:</div>
                   <div>شكراً لتعاملكم معنا.</div>
                   <div>يُرجى الدفع خلال 30 يوماً من تاريخ الفاتورة.</div>
-                  <div style={{ marginTop: 6, fontSize: 11 }}>للاستفسار: info@sahl.sa | 0112345678</div>
+                  <div style={{ marginTop: 6, fontSize: 11 }}>للاستفسار: {co.email || '—'} | {co.phone || '—'}</div>
                   {isVoided && (
                     <div style={{ marginTop: 8, color: 'var(--danger)', fontWeight: 700, fontSize: 12 }}>
                       ⚠ هذه الفاتورة مسترجعة وملغاة
@@ -531,7 +531,7 @@ export default function InvoiceDetailPage() {
             </div>
 
             <div style={{ marginTop: 36, paddingTop: 14, borderTop: `2px solid ${tpl.accentColor}20`, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)' }}>
-              <div>شركة سهل التقنية — السجل التجاري: 1234567890</div>
+              <div>{co.name || '—'} — السجل التجاري: {co.cr || '—'}</div>
               <div style={{ textAlign: 'center' }}>صفحة 1 من 1</div>
               <div>تم الإصدار بنظام سهل ERP</div>
             </div>

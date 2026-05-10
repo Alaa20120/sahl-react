@@ -11,6 +11,7 @@ import { useInventoryStore } from '@/store/inventory.store'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useHRStore } from '@/store/hr.store'
+import { useAppStore } from '@/store/app.store'
 
 type RptTpl = 'formal' | 'modern' | 'clean' | 'compact' | 'bold'
 
@@ -285,6 +286,7 @@ function printReport(
   report: typeof REPORT_GROUPS[0]['reports'][0],
   period: string,
   tpl: typeof RPT_TEMPLATES[0],
+  company: ReturnType<typeof useAppStore.getState>['company'],
 ) {
   const win = window.open('', '_blank', 'width=860,height=720')
   if (!win) { toast('يرجى السماح بالنوافذ المنبثقة', 'warn'); return }
@@ -354,8 +356,8 @@ function printReport(
   <div class="hdr">
     <div class="hdr-top">
       <div>
-        <div class="company-name">شركة سهل التقنية</div>
-        <div class="company-sub">الرقم الضريبي: 310123456700003 &nbsp;|&nbsp; الرياض، المملكة العربية السعودية</div>
+        <div class="company-name">${company.name || '—'}</div>
+        <div class="company-sub">${company.vat ? 'الرقم الضريبي: ' + company.vat + ' &nbsp;|&nbsp; ' : ''}${[company.city, company.country].filter(Boolean).join('، ')}</div>
       </div>
       <div class="report-title-box">
         <div class="report-title">${report.label}</div>
@@ -446,6 +448,7 @@ export default function ReportsPage() {
   const accounts = useTreasuryStore(s => s.accounts)
   const delegates = useDelegateStore(s => s.delegates)
   const employees = useHRStore(s => s.employees)
+  const company = useAppStore(s => s.company)
 
   // ── Real computed data ────────────────────────────────────────────────────
   const d = useMemo(() => {
@@ -667,7 +670,7 @@ export default function ReportsPage() {
   const activeTpl = RPT_TEMPLATES.find(t => t.id === rptTpl) ?? RPT_TEMPLATES[0]
 
   const handleReport = (report: { label: string; desc: string; icon: string; data: { label: string; value: number; type: string }[] }) => {
-    printReport(report as any, period, activeTpl)
+    printReport(report as any, period, activeTpl, company)
     toast(`جارٍ تحضير تقرير: ${report.label}...`, 'info')
   }
 

@@ -5,6 +5,7 @@ import { toast } from '@/lib/toast'
 import { useCustomerStore } from '@/store/customer.store'
 import { useInvoiceStore } from '@/store/invoice.store'
 import { usePurchaseStore } from '@/store/purchase.store'
+import { useAppStore } from '@/store/app.store'
 
 type StmtTpl = 'formal' | 'compact' | 'detailed'
 
@@ -18,6 +19,7 @@ export default function AccountStatementPage() {
   const { customers } = useCustomerStore()
   const { invoices } = useInvoiceStore()
   const { purchases } = usePurchaseStore()
+  const company = useAppStore(s => s.company)
 
   const defaultTo   = new Date().toISOString().split('T')[0]
   const defaultFrom = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0]
@@ -143,8 +145,8 @@ export default function AccountStatementPage() {
       <div class="hdr">
         <div class="hdr-inner">
           <div>
-            <div style="font-size:20px;font-weight:800">شركة سهل التقنية</div>
-            <div style="font-size:11px;opacity:.7;margin-top:4px">الرياض | الرقم الضريبي: 310123456700003</div>
+            <div style="font-size:20px;font-weight:800">${company.name || '—'}</div>
+            <div style="font-size:11px;opacity:.7;margin-top:4px">${[company.city, company.country].filter(Boolean).join('، ')} ${company.vat ? '| الرقم الضريبي: ' + company.vat : ''}</div>
           </div>
           <div style="text-align:left">
             <div style="font-size:22px;font-weight:900">كشف حساب</div>
@@ -184,7 +186,7 @@ export default function AccountStatementPage() {
             <tr class="total"><td colspan="3">الإجمالي الختامي</td><td style="color:#EF4444">${totalDebit.toLocaleString('ar-SA')}</td><td style="color:#10B981">${totalCredit.toLocaleString('ar-SA')}</td><td style="color:${balance>0?'#F59E0B':'#10B981'}">${Math.abs(balance).toLocaleString('ar-SA')} ${balance>0?'مدين':'دائن'}</td></tr>
           </tbody>
         </table>
-        <div class="footer"><div>شركة سهل التقنية — تم الإصدار بنظام سهل ERP</div><div>تاريخ الإصدار: ${new Date().toLocaleDateString('ar-SA')}</div></div>
+        <div class="footer"><div>${company.name || '—'} — تم الإصدار بنظام سهل ERP</div><div>تاريخ الإصدار: ${new Date().toLocaleDateString('ar-SA')}</div></div>
       </div>
     </div>
     <script>window.onload=()=>{window.print();}<\/script>

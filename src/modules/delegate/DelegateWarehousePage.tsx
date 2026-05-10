@@ -16,7 +16,15 @@ export default function DelegateWarehousePage() {
     const allWarehouse = delegate?.warehouse ?? []
     const invoices = delegate?.invoices ?? []
 
-    // Sold from confirmed/paid sale invoices (only if items loaded)
+    // Step 1: current available qty from warehouse (already has confirmed-sale deductions applied)
+    const grouped: Record<string, { name: string; sku: string; cost: number; available: number }> = {}
+    allWarehouse.forEach((w: any) => {
+      const key = w.productId || w.productName
+      if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, available: 0 }
+      grouped[key].available += w.qty
+    })
+
+    // Step 2: sold qty from confirmed/paid sale invoices
     const soldQty: Record<string, number> = {}
     invoices
       .filter((inv: any) => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
@@ -26,19 +34,18 @@ export default function DelegateWarehousePage() {
         })
       })
 
-    // Aggregate received by product
-    const grouped: Record<string, { name: string; sku: string; cost: number; received: number }> = {}
-    allWarehouse.forEach((w: any) => {
-      const key = w.productId || w.productName
-      if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, received: 0 }
-      grouped[key].received += w.qty
+    // Step 3: include fully-sold products (no longer in warehouse)
+    Object.keys(soldQty).forEach(productId => {
+      if (!grouped[productId]) {
+        const sample = invoices.flatMap((inv: any) => inv.items || []).find((it: any) => it.productId === productId)
+        if (sample) grouped[productId] = { name: sample.description, sku: '', cost: sample.price, available: 0 }
+      }
     })
 
-    return Object.entries(grouped).map(([key, r]) => ({
-      key, ...r,
-      sold: soldQty[key] || 0,
-      available: Math.max(0, r.received - (soldQty[key] || 0)),
-    }))
+    return Object.entries(grouped).map(([key, r]) => {
+      const sold = soldQty[key] || 0
+      return { key, ...r, sold, received: r.available + sold }
+    })
   }, [delegate])
 
   const totalReceived = rows.reduce((s, r) => s + r.received, 0)

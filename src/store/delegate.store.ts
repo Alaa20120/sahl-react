@@ -529,6 +529,6 @@ export const useDelegateStore = create<DelegateStore>()(
         }))
       },
     }),
-    { name: 'sahl-delegates-v3' }
+    { name: 'sahl-delegates-v4' }
   )
 )

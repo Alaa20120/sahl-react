@@ -13,7 +13,7 @@ interface PurchaseStore {
 
   fetch: () => Promise<void>
   nextNumber: () => string
-  addPurchase: (data: Omit<Purchase, 'id'>) => Promise<Purchase>
+  addPurchase: (data: Omit<Purchase, 'id' | 'number'>) => Promise<Purchase>
   updateStatus: (id: string, status: PurchaseStatus) => Promise<void>
   addPayment: (id: string, amount: number) => Promise<void>
   confirmReceipt: (id: string) => Promise<void>

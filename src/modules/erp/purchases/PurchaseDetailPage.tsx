@@ -251,9 +251,6 @@ export default function PurchaseDetailPage() {
 
   const handleConfirmReceipt = () => {
     confirmReceipt(po.id)
-    po.lineItems.forEach(item => {
-      if (item.productId) addStock(item.productId, item.qty)
-    })
     setStatus('received')
     toast('تم تأكيد الاستلام وإضافة الكميات للمخزون', 'success')
   }

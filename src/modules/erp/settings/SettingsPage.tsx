@@ -3,6 +3,20 @@ import PageHeader from '@/components/ui/PageHeader'
 import Card from '@/components/ui/Card'
 import { toast } from '@/lib/toast'
 import { useAppStore } from '@/store/app.store'
+import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
+
+// Delete order respects FK dependencies (child → parent)
+const RESET_TABLES = [
+  'invoice_items', 'invoices',
+  'purchase_items', 'purchases',
+  'customer_payments', 'customers',
+  'stock_movements', 'products',
+  'expenses',
+  'treasury_transactions',
+  'employees',
+  'delegate_invoices', 'delegate_warehouse', 'delegates',
+  'categories',
+]
 
 const TABS = ['الشركة', 'الفواتير', 'الضريبة', 'الإشعارات', 'النسخ الاحتياطي']
 
@@ -13,6 +27,30 @@ export default function SettingsPage() {
   const setInvoiceNotes = useAppStore(s => s.setInvoiceNotes)
 
   const [tab, setTab] = useState('الشركة')
+  const [resetting, setResetting] = useState(false)
+
+  async function handleFullReset() {
+    if (!window.confirm('⚠️ سيتم حذف جميع البيانات (فواتير، عملاء، مخزون، مشتريات...) بشكل نهائي لا يمكن التراجع عنه. هل أنت متأكد؟')) return
+    if (!window.confirm('تأكيد نهائي — هذه العملية لا يمكن التراجع عنها. اضغط موافق للمتابعة.')) return
+    setResetting(true)
+    try {
+      if (isSupabaseConfigured()) {
+        for (const table of RESET_TABLES) {
+          try { await supaFetch(table, { method: 'DELETE', filter: 'id=not.is.null' }) } catch { /* skip */ }
+        }
+      }
+      // Clear all data stores from localStorage (keep auth + company settings)
+      const KEEP = new Set(['sahl-auth', 'sahl-app-v2'])
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('sahl-') && !KEEP.has(k)) localStorage.removeItem(k)
+      })
+      toast('تم مسح جميع البيانات بنجاح — جارٍ إعادة التشغيل...', 'success')
+      setTimeout(() => window.location.reload(), 1800)
+    } catch (e: any) {
+      toast(`خطأ أثناء المسح: ${e.message}`, 'danger')
+      setResetting(false)
+    }
+  }
   const [logo, setLogo] = useState<string | null>(storeCompany.logo)
   const [company, setCompany] = useState({ ...storeCompany })
   const [invoiceNotes, _setLocalNotes] = useState(storeNotes)
@@ -265,6 +303,43 @@ export default function SettingsPage() {
               </div>
             </div>
           </Card>
+
+          {/* Danger Zone */}
+          <div style={{ border: '2px solid var(--danger)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--danger)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <i className="fa fa-triangle-exclamation" style={{ color: '#fff', fontSize: 18 }} />
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>منطقة الخطر — إعادة التعيين الكاملة</span>
+            </div>
+            <div style={{ padding: 20, background: 'var(--danger-bg)' }}>
+              <p style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600, marginBottom: 8 }}>
+                هذا الإجراء سيحذف بشكل نهائي جميع البيانات التالية:
+              </p>
+              <ul style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16, paddingRight: 18, lineHeight: 2 }}>
+                <li>جميع الفواتير وبنودها</li>
+                <li>جميع أوامر الشراء وبنودها</li>
+                <li>جميع العملاء والموردين والمدفوعات</li>
+                <li>جميع المنتجات وحركات المخزون</li>
+                <li>جميع المصروفات والموظفين</li>
+                <li>جميع معاملات الخزينة</li>
+                <li>جميع بيانات المناديب</li>
+                <li>جميع الفئات</li>
+              </ul>
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+                ✅ سيتم الاحتفاظ ببيانات الشركة وبيانات تسجيل الدخول فقط.
+              </p>
+              <button
+                className="btn"
+                disabled={resetting}
+                onClick={handleFullReset}
+                style={{ background: 'var(--danger)', color: '#fff', fontWeight: 700, border: 'none' }}
+              >
+                {resetting
+                  ? <><i className="fa fa-spinner fa-spin" /> جارٍ المسح...</>
+                  : <><i className="fa fa-trash-can" /> حذف جميع البيانات والبدء من جديد</>
+                }
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

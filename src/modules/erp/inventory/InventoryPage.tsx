@@ -71,6 +71,13 @@ export default function InventoryPage() {
   const [adjustQty, setAdjustQty] = useState('')
   const adjustSaving = useSaving()
 
+  // Withdraw from delegate warehouse
+  const [showWithdrawDlg, setShowWithdrawDlg] = useState(false)
+  const [withdrawDelegateId, setWithdrawDelegateId] = useState('')
+  const [withdrawItemId, setWithdrawItemId] = useState('')
+  const [withdrawQtyInput, setWithdrawQtyInput] = useState('')
+  const transferToMainWarehouse = useDelegateStore(s => s.transferToMainWarehouse)
+
   const filtered = products.filter(p => {
     const matchCat = category === 'الكل' || p.category === category
     const matchSearch = !search || p.name.includes(search) || p.sku.includes(search)
@@ -160,6 +167,9 @@ export default function InventoryPage() {
             </button>
             <button className="btn btn-outline btn-sm" onClick={() => { setShowNewCat(true); setNewCatName(''); setCatError('') }}>
               <i className="fa fa-tag" /> فئة جديدة
+            </button>
+            <button className="btn btn-outline btn-sm" onClick={() => { setShowWithdrawDlg(true); setWithdrawDelegateId(''); setWithdrawItemId(''); setWithdrawQtyInput('') }}>
+              <i className="fa fa-warehouse" /> سحب من مندوب
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
               <i className="fa fa-plus" /> صنف جديد
@@ -614,6 +624,64 @@ export default function InventoryPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Withdraw from Delegate Warehouse Modal */}
+      <Modal
+        open={showWithdrawDlg}
+        onClose={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawItemId(''); setWithdrawQtyInput('') }}
+        title="سحب صنف من مستودع مندوب"
+        width={480}
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawItemId(''); setWithdrawQtyInput('') }}>إلغاء</button>
+            <button className="btn btn-primary" disabled={!withdrawDelegateId || !withdrawItemId || !withdrawQtyInput} onClick={async () => {
+              const qty = parseInt(withdrawQtyInput)
+              if (isNaN(qty) || qty <= 0) { toast('أدخل كمية صحيحة', 'warn'); return }
+              const delegate = delegates.find(d => d.id === withdrawDelegateId)
+              const item = delegate?.warehouse.find(w => w.id === withdrawItemId)
+              if (!item) { toast('الصنف غير موجود', 'warn'); return }
+              if (qty > item.qty) { toast('الكمية المطلوبة أكبر من المتاح', 'warn'); return }
+              await transferToMainWarehouse(withdrawDelegateId, withdrawItemId, qty)
+              toast(`تم سحب ${qty} ${item.productName} من ${delegate?.name} وإضافته للمخزن الرئيسي`, 'success')
+              setShowWithdrawDlg(false)
+              setWithdrawDelegateId('')
+              setWithdrawItemId('')
+              setWithdrawQtyInput('')
+            }}>
+              <i className="fa fa-check" /> تأكيد السحب
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">المندوب</label>
+            <select className="form-control" value={withdrawDelegateId} onChange={e => { setWithdrawDelegateId(e.target.value); setWithdrawItemId(''); setWithdrawQtyInput('') }}>
+              <option value="">اختر مندوب...</option>
+              {delegates.filter(d => d.warehouse.length > 0).map(d => (
+                <option key={d.id} value={d.id}>{d.name} ({d.warehouse.length} صنف)</option>
+              ))}
+            </select>
+          </div>
+          {withdrawDelegateId && (
+            <div className="form-group">
+              <label className="form-label">الصنف</label>
+              <select className="form-control" value={withdrawItemId} onChange={e => { setWithdrawItemId(e.target.value); setWithdrawQtyInput('') }}>
+                <option value="">اختر صنف...</option>
+                {delegates.find(d => d.id === withdrawDelegateId)?.warehouse.map(w => (
+                  <option key={w.id} value={w.id}>{w.productName} — متاح: {w.qty} {w.productSku ? `(${w.productSku})` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {withdrawItemId && (
+            <div className="form-group">
+              <label className="form-label">الكمية المراد سحبها</label>
+              <input className="form-control" type="number" min="1" value={withdrawQtyInput} onChange={e => setWithdrawQtyInput(e.target.value)} placeholder="أدخل الكمية..." />
+            </div>
+          )}
+        </div>
       </Modal>
     </>
   )

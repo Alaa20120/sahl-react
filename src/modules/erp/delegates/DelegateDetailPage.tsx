@@ -442,7 +442,7 @@ export default function DelegateDetailPage() {
             </div>
           </div>
           {(() => {
-            // Aggregate by product + subtract sold
+            // Aggregate by product: warehouse.qty is already net (after confirm + transfers)
             const soldQty: Record<string, number> = {}
             d.invoices
               .filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
@@ -450,18 +450,18 @@ export default function DelegateDetailPage() {
                 if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
               }))
 
-            const grouped: Record<string, { name: string; sku: string; cost: number; received: number; ids: string[] }> = {}
+            const grouped: Record<string, { name: string; sku: string; cost: number; available: number; ids: string[] }> = {}
             d.warehouse.forEach(w => {
               const key = w.productId || w.productName
-              if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, received: 0, ids: [] }
-              grouped[key].received += w.qty
+              if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, available: 0, ids: [] }
+              grouped[key].available += w.qty
               grouped[key].ids.push(w.id)
             })
 
             const rows = Object.entries(grouped).map(([key, r]) => ({
               key, ...r,
               sold: soldQty[key] || 0,
-              available: Math.max(0, r.received - (soldQty[key] || 0)),
+              received: r.available + (soldQty[key] || 0),
             }))
 
             if (rows.length === 0) return (

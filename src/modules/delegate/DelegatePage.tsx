@@ -425,12 +425,12 @@ export default function DelegatePage() {
       )}
 
       {tab === 'warehouse' && (() => {
-        // Aggregate warehouse: total received per product
-        const receivedByProduct: Record<string, { name: string; sku: string; cost: number; total: number }> = {}
+        // warehouse.qty is already net (received - sold - transferred)
+        const availableByProduct: Record<string, { name: string; sku: string; cost: number; available: number }> = {}
         delegateWarehouse.forEach((w: any) => {
           const key = w.productId || w.productName
-          if (!receivedByProduct[key]) receivedByProduct[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, total: 0 }
-          receivedByProduct[key].total += w.qty
+          if (!availableByProduct[key]) availableByProduct[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, available: 0 }
+          availableByProduct[key].available += w.qty
         })
         // Sold quantities from confirmed/paid sale invoices
         const soldByProduct: Record<string, number> = {}
@@ -439,10 +439,10 @@ export default function DelegatePage() {
             if (it.productId) soldByProduct[it.productId] = (soldByProduct[it.productId] || 0) + (it.qty || 0)
           })
         })
-        const rows = Object.entries(receivedByProduct).map(([key, data]) => ({
+        const rows = Object.entries(availableByProduct).map(([key, data]) => ({
           key, ...data,
           sold: soldByProduct[key] || 0,
-          available: Math.max(0, data.total - (soldByProduct[key] || 0)),
+          received: data.available + (soldByProduct[key] || 0),
         }))
 
         return (
@@ -463,7 +463,7 @@ export default function DelegatePage() {
                   {rows.map(r => (
                     <tr key={r.key}>
                       <td style={{ fontWeight: 600 }}>{r.name}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{fmtNum(r.total)}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{fmtNum(r.received)}</td>
                       <td style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{r.sold > 0 ? fmtNum(r.sold) : '—'}</td>
                       <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
                       <td>{fmt(r.cost)}</td>
@@ -475,7 +475,7 @@ export default function DelegatePage() {
                 <tfoot>
                   <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
                     <td>الإجمالي</td>
-                    <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + r.total, 0))}</td>
+                    <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + r.received, 0))}</td>
                     <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{fmtNum(rows.reduce((s, r) => s + r.sold, 0))}</td>
                     <td style={{ textAlign: 'center', color: 'var(--success)' }}>{fmtNum(rows.reduce((s, r) => s + r.available, 0))}</td>
                     <td></td>

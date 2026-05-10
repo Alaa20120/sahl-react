@@ -43,8 +43,11 @@ export const useCustomerStore = create<CustomerStore>()(
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
         try {
-          const data = await supaFetch('customers', { select: '*', limit: 500 })
-          const mapped = (data || []).map((c: any): Customer => ({
+          const [customersData, paymentsData] = await Promise.all([
+            supaFetch('customers', { select: '*', limit: 500 }),
+            supaFetch('customer_payments', { select: '*', limit: 2000 }),
+          ])
+          const mapped = (customersData || []).map((c: any): Customer => ({
             id: c.id,
             name: c.name,
             type: c.type,
@@ -58,7 +61,19 @@ export const useCustomerStore = create<CustomerStore>()(
             status: c.status,
             since: c.since,
           }))
-          set({ customers: mapped, loading: false })
+          const mappedPayments: CustomerPayment[] = (paymentsData || []).map((p: any) => ({
+            id: p.id,
+            customerId: p.customer_id,
+            date: p.date,
+            amount: Number(p.amount) || 0,
+            type: p.type,
+            method: p.method || '',
+            description: p.description || '',
+            refId: p.ref_id || p.id,
+            balanceBefore: Number(p.balance_before) || 0,
+            balanceAfter: Number(p.balance_after) || 0,
+          }))
+          set({ customers: mapped, payments: mappedPayments, loading: false })
         } catch (e: any) {
           set({ error: e.message, loading: false })
         }

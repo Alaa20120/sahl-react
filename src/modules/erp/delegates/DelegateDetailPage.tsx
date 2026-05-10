@@ -537,7 +537,7 @@ export default function DelegateDetailPage() {
                   const st = INV_STATUS[inv.status]
                   const paidAmount = inv.paidAmount ?? (inv.status === 'paid' ? inv.total : 0)
                   return (
-                    <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/delegate/invoices/${inv.id}`)}>
+                    <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/erp/delegates/${d.id}/invoices/${inv.id}`)}>
                       <td><span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 12, color: 'var(--blue)' }}>{inv.number}</span></td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(inv.date)}</td>
                       <td><span style={{ background: inv.type === 'sale' ? 'var(--success-bg)' : 'var(--blue-light)', color: inv.type === 'sale' ? 'var(--success)' : 'var(--blue)', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{inv.type === 'sale' ? 'بيع' : 'شراء'}</span></td>
@@ -589,7 +589,7 @@ export default function DelegateDetailPage() {
                           <td style={{ fontWeight: 700 }}>{fmt(inv.total)}</td>
                           <td style={{ color: 'var(--danger)', fontWeight: 700 }}>{fmt(remaining)}</td>
                           <td>
-                            <button className="btn btn-primary btn-sm" onClick={() => navigate(`/delegate/invoices/${inv.id}`)}>
+                            <button className="btn btn-primary btn-sm" onClick={() => navigate(`/erp/delegates/${d.id}/invoices/${inv.id}`)}>
                               <i className="fa fa-money-bill-wave" /> سداد
                             </button>
                           </td>

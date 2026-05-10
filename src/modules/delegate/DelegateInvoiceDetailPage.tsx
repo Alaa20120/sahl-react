@@ -22,10 +22,10 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
 }
 
 export default function DelegateInvoiceDetailPage() {
-  const { id } = useParams<{ id: string }>()
+  const { id, delegateId: urlDelegateId } = useParams<{ id: string; delegateId?: string }>()
   const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
-  const delegateId = user?.delegateId || ''
+  const delegateId = urlDelegateId || user?.delegateId || ''
   const delegates = useDelegateStore(s => s.delegates)
   const payDelegateInvoice = useDelegateStore(s => s.payDelegateInvoice)
   const confirmDelegateInvoice = useDelegateStore(s => s.confirmDelegateInvoice)
@@ -61,8 +61,8 @@ export default function DelegateInvoiceDetailPage() {
       <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>
         <i className="fa fa-file-circle-xmark" style={{ fontSize: 48, marginBottom: 16, display: 'block', opacity: .3 }} />
         <div style={{ fontSize: 16, fontWeight: 700 }}>الفاتورة غير موجودة</div>
-        <button className="btn btn-outline btn-sm" style={{ marginTop: 16 }} onClick={() => navigate('/delegate/invoices')}>
-          <i className="fa fa-arrow-right" /> رجوع للفواتير
+        <button className="btn btn-outline btn-sm" style={{ marginTop: 16 }} onClick={() => navigate(urlDelegateId ? `/erp/delegates/${urlDelegateId}` : '/delegate/invoices')}>
+          <i className="fa fa-arrow-right" /> {urlDelegateId ? 'رجوع للمندوب' : 'رجوع للفواتير'}
         </button>
       </div>
     )
@@ -112,7 +112,7 @@ export default function DelegateInvoiceDetailPage() {
     <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 0 40px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="btn btn-outline btn-sm" onClick={() => navigate('/delegate/invoices')}>
+        <button className="btn btn-outline btn-sm" onClick={() => navigate(urlDelegateId ? `/erp/delegates/${urlDelegateId}` : '/delegate/invoices')}>
           <i className="fa fa-arrow-right" /> رجوع
         </button>
         <div style={{ flex: 1 }}>
@@ -374,8 +374,8 @@ export default function DelegateInvoiceDetailPage() {
                   <i className="fa fa-rotate-left" /> استرجاع الفاتورة
                 </button>
               )}
-              <button className="btn btn-outline btn-sm w-full" style={{ justifyContent: 'center' }} onClick={() => navigate('/delegate/invoices')}>
-                <i className="fa fa-list" /> قائمة الفواتير
+              <button className="btn btn-outline btn-sm w-full" style={{ justifyContent: 'center' }} onClick={() => navigate(urlDelegateId ? `/erp/delegates/${urlDelegateId}` : '/delegate/invoices')}>
+                <i className="fa fa-list" /> {urlDelegateId ? 'رجوع للمندوب' : 'قائمة الفواتير'}
               </button>
             </div>
           </div>

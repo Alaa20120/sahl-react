@@ -190,6 +190,7 @@ export default function App() {
           <Route path="help"               element={S(Help)} />
           <Route path="delegates"            element={S(DelegatesListPage)} />
           <Route path="delegates/:id"      element={S(DelegateDetailPage)} />
+          <Route path="delegates/:delegateId/invoices/:id" element={S(DelegateInvoiceDetail)} />
           <Route path="customers-balance"  element={S(CustomersBalance)} />
           <Route path="templates"          element={S(Templates)} />
         </Route>

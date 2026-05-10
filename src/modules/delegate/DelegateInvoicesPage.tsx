@@ -106,10 +106,13 @@ export default function DelegateInvoicesPage() {
                       </td>
                       <td><span className={`status ${st.css}`}>{st.label}</span></td>
                       <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          <button className="btn btn-sm btn-outline" onClick={() => navigate(`/delegate/invoices/${inv.id}`)} title="عرض تفاصيل الفاتورة">
+                            <i className="fa fa-eye" /> عرض
+                          </button>
                           {inv.type === 'sale' && inv.status === 'pending' && (
                             <button className="btn btn-sm btn-primary" onClick={() => handleConfirm(inv.id)} title="تأكيد التسليم وخصم المخزون">
-                              <i className="fa fa-truck" /> تأكيد التسليم
+                              <i className="fa fa-truck" /> تأكيد
                             </button>
                           )}
                           {inv.paymentMethod === 'credit' && remaining > 0 && (
@@ -168,10 +171,13 @@ export default function DelegateInvoicesPage() {
                 <span className="mobile-card-label">الحالة</span>
                 <span className={`status ${st.css}`}>{st.label}</span>
               </div>
-              <div className="mobile-card-row" style={{ paddingTop: 8 }}>
+              <div className="mobile-card-row" style={{ paddingTop: 8, gap: 8 }}>
+                <button className="btn btn-sm btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => navigate(`/delegate/invoices/${inv.id}`)}>
+                  <i className="fa fa-eye" /> عرض الفاتورة
+                </button>
                 {inv.type === 'sale' && inv.status === 'pending' && (
                   <button className="btn btn-sm btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => handleConfirm(inv.id)}>
-                    <i className="fa fa-truck" /> تأكيد التسليم
+                    <i className="fa fa-truck" /> تأكيد
                   </button>
                 )}
                 {inv.paymentMethod === 'credit' && remaining > 0 && (

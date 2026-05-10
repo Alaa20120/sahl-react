@@ -314,6 +314,7 @@ export const useDelegateStore = create<DelegateStore>()(
         const invoice = delegate.invoices.find(inv => inv.id === invoiceId)
         if (!invoice) return { success: false, failedItem: 'الفاتورة غير موجودة' }
         if (invoice.type !== 'sale') return { success: false, failedItem: 'التأكيد للمبيعات فقط' }
+        if (invoice.status === 'confirmed' || invoice.status === 'paid') return { success: false, failedItem: 'الفاتورة مؤكدة بالفعل' }
         for (const item of invoice.items) {
           if (!item.productId) continue
           const whItem = delegate.warehouse.find(w => w.productId === item.productId && w.status === 'in-stock')

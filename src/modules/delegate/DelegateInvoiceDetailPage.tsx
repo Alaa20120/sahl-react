@@ -45,6 +45,10 @@ export default function DelegateInvoiceDetailPage() {
 
   async function handleConfirmDelivery() {
     if (!invoice) return
+    if (invoice.status === 'confirmed' || invoice.status === 'paid') {
+      toast('الفاتورة مؤكدة بالفعل — لا يمكن تأكيدها مرة أخرى', 'warn')
+      return
+    }
     const result = await confirmDelegateInvoice(delegateId, invoice.id)
     if (!result.success) {
       toast(`تعذر التأكيد: "${result.failedItem}" — الكمية غير كافية في المستودع`, 'danger')

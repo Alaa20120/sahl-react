@@ -346,3 +346,29 @@ CREATE TABLE IF NOT EXISTS payroll_overrides (
 ALTER TABLE payroll_overrides ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "payroll_overrides_select" ON payroll_overrides FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "payroll_overrides_write" ON payroll_overrides FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 21. company_settings table (single row, id = 'default')
+CREATE TABLE IF NOT EXISTS company_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  name TEXT,
+  name_en TEXT,
+  cr TEXT,
+  vat TEXT,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  city TEXT,
+  country TEXT DEFAULT 'المملكة العربية السعودية',
+  logo TEXT,
+  currency TEXT DEFAULT 'SAR',
+  vat_rate DECIMAL(5,2) DEFAULT 15,
+  branch TEXT DEFAULT 'الرئيسي',
+  fiscal_year_start TEXT DEFAULT '01-01',
+  invoice_notes TEXT DEFAULT 'شكراً لتعاملكم معنا. يُرجى الدفع خلال 30 يوماً من تاريخ الفاتورة.',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 22. RLS for company_settings
+ALTER TABLE company_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "company_settings_select" ON company_settings FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "company_settings_write" ON company_settings FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));

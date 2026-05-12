@@ -16,6 +16,7 @@ import { useTreasuryStore } from '@/store/treasury.store'
 import { useHRStore } from '@/store/hr.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useCategoryStore } from '@/store/category.store'
+import { useAppStore } from '@/store/app.store'
 
 // ERP core
 const Dashboard        = lazy(() => import('@/modules/erp/dashboard/DashboardPage'))
@@ -105,6 +106,7 @@ function AppDataProvider() {
       useHRStore.getState().fetch()
       useDelegateStore.getState().fetch()
       useCategoryStore.getState().fetch()
+      useAppStore.getState().fetch()
     }
 
     return unsubscribe
@@ -131,6 +133,24 @@ function AppDataProvider() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'delegate_invoices' }, () => useDelegateStore.getState().fetch()),
       supabase.channel('salary-payments-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'salary_payments' }, () => useHRStore.getState().fetch()),
+      supabase.channel('stock-movements-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_movements' }, () => useInventoryStore.getState().fetch()),
+      supabase.channel('treasury-transactions-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_transactions' }, () => useTreasuryStore.getState().fetch()),
+      supabase.channel('treasury-accounts-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_accounts' }, () => useTreasuryStore.getState().fetch()),
+      supabase.channel('delegate-transactions-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'delegate_transactions' }, () => useDelegateStore.getState().fetch()),
+      supabase.channel('customer-payments-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, () => useCustomerStore.getState().fetch()),
+      supabase.channel('payroll-overrides-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payroll_overrides' }, () => useHRStore.getState().fetchPayrollOverrides(new Date().toISOString().slice(0, 7))),
+      supabase.channel('employees-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => useHRStore.getState().fetch()),
+      supabase.channel('delegates-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'delegates' }, () => useDelegateStore.getState().fetch()),
+      supabase.channel('company-settings-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => useAppStore.getState().fetch()),
     ]
     channels.forEach(c => c.subscribe())
     return () => channels.forEach(c => supabase.removeChannel(c))

@@ -38,14 +38,20 @@ export const useInvoiceStore = create<InvoiceStore>()(
         set({ loading: true, error: null })
         try {
           // Fetch invoices and their items in two calls, then join client-side
-          const [invoicesData, itemsData] = await Promise.all([
+          const [invoicesData, itemsData, attachmentsData] = await Promise.all([
             supaFetch('invoices', { select: '*', limit: 500 }),
             supaFetch('invoice_items', { select: '*', limit: 2000 }),
+            supaFetch('invoice_attachments', { select: '*', limit: 2000 }),
           ])
           const itemsByInvoice: Record<string, any[]> = {}
           for (const it of (itemsData || [])) {
             if (!itemsByInvoice[it.invoice_id]) itemsByInvoice[it.invoice_id] = []
             itemsByInvoice[it.invoice_id].push(it)
+          }
+          const attachmentsByInvoice: Record<string, any[]> = {}
+          for (const att of (attachmentsData || [])) {
+            if (!attachmentsByInvoice[att.invoice_id]) attachmentsByInvoice[att.invoice_id] = []
+            attachmentsByInvoice[att.invoice_id].push(att)
           }
           const mapped = (invoicesData || []).map((inv: any): Invoice => ({
             id: inv.id,
@@ -69,7 +75,13 @@ export const useInvoiceStore = create<InvoiceStore>()(
               total: Number(it.total) || 0,
             })),
             createdBy: inv.created_by || undefined,
-            attachments: [],
+            attachments: (attachmentsByInvoice[inv.id] || []).map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              type: a.type,
+              dataUrl: a.storage_path,
+              uploadedAt: a.uploaded_at,
+            })),
           }))
           set({ invoices: mapped, loading: false })
         } catch (e: any) {
@@ -210,11 +222,28 @@ export const useInvoiceStore = create<InvoiceStore>()(
       },
 
       async addAttachment(invoiceId, file) {
-        const attachment = { id: `ATT-${Date.now()}`, name: file.name, type: file.type, dataUrl: file.dataUrl, uploadedAt: new Date().toISOString() }
+        let dbId = `ATT-${Date.now()}`
+        if (isSupabaseConfigured()) {
+          const inserted = await supaFetch('invoice_attachments', {
+            method: 'POST',
+            body: {
+              invoice_id: invoiceId,
+              name: file.name,
+              type: file.type,
+              storage_path: file.dataUrl,
+            },
+          })
+          const row = Array.isArray(inserted) ? inserted[0] : inserted
+          if (row?.id) dbId = row.id
+        }
+        const attachment = { id: dbId, name: file.name, type: file.type, dataUrl: file.dataUrl, uploadedAt: new Date().toISOString() }
         set(state => ({ invoices: state.invoices.map(inv => inv.id === invoiceId ? { ...inv, attachments: [...inv.attachments, attachment] } : inv) }))
       },
 
       async removeAttachment(invoiceId, attachmentId) {
+        if (isSupabaseConfigured()) {
+          await supaFetch('invoice_attachments', { method: 'DELETE', filter: `id=eq.${attachmentId}` })
+        }
         set(state => ({ invoices: state.invoices.map(inv => inv.id === invoiceId ? { ...inv, attachments: inv.attachments.filter(a => a.id !== attachmentId) } : inv) }))
       },
 

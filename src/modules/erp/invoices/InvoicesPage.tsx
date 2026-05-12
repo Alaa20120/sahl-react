@@ -82,6 +82,7 @@ export default function InvoicesPage() {
           id: `${del.id}::${inv.id}`,
           number: inv.number,
           customer: inv.party,
+          customerId: inv.customerId,
           date: inv.date,
           dueDate: inv.date,
           amount: inv.subtotal,

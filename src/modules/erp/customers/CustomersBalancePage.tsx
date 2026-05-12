@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PageHeader from '@/components/ui/PageHeader'
 import { fmt, fmtDate } from '@/lib/format'
 import { type Customer } from '@/lib/mock-data/customers'
@@ -24,6 +25,7 @@ function BalanceBar({ value, max }: { value: number; max: number }) {
 }
 
 function BalanceSection({ data, type }: { data: Customer[]; type: View }) {
+  const navigate = useNavigate()
   const isCustomer = type === 'customers'
   const positive  = data.filter(c => c.balance > 0)
   const negative  = data.filter(c => c.balance < 0)
@@ -103,6 +105,7 @@ function BalanceSection({ data, type }: { data: Customer[]; type: View }) {
                 <th style={{ minWidth: 200 }}>مؤشر الرصيد</th>
                 <th>الحالة</th>
                 <th>منذ</th>
+                <th>الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -136,6 +139,15 @@ function BalanceSection({ data, type }: { data: Customer[]; type: View }) {
                     </span>
                   </td>
                   <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(c.since)}</td>
+                  <td>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => navigate(`/erp/invoices?customer=${c.id}`)}
+                      title="عرض الفواتير"
+                    >
+                      <i className="fa fa-file-invoice" /> الفواتير
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

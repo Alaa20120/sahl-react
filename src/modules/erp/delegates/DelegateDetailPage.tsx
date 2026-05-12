@@ -563,7 +563,7 @@ export default function DelegateDetailPage() {
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>الفاتورة</th><th>العميل</th><th>الإجمالي</th><th>المتبقي</th><th>إجراء</th></tr>
+                    <tr><th>الفاتورة</th>{!isMobile && <th>العميل</th>}<th>الإجمالي</th><th>المتبقي</th><th>إجراء</th></tr>
                   </thead>
                   <tbody>
                     {d.invoices.filter(i => i.type === 'sale' && i.status !== 'paid').map(inv => {
@@ -572,12 +572,14 @@ export default function DelegateDetailPage() {
                       return (
                         <tr key={inv.id}>
                           <td><span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--blue)' }}>{inv.number}</span></td>
-                          <td>
-                            <button className="btn btn-sm btn-link" style={{ padding: 0, fontWeight: 600 }}
-                              onClick={() => customer && navigate('/erp/customers', { state: { openProfile: customer.id } })}>
-                              {inv.party}
-                            </button>
-                          </td>
+                          {!isMobile && (
+                            <td>
+                              <button className="btn btn-sm btn-link" style={{ padding: 0, fontWeight: 600 }}
+                                onClick={() => customer && navigate('/erp/customers', { state: { openProfile: customer.id } })}>
+                                {inv.party}
+                              </button>
+                            </td>
+                          )}
                           <td style={{ fontWeight: 700 }}>{fmt(inv.total)}</td>
                           <td style={{ color: 'var(--danger)', fontWeight: 700 }}>{fmt(remaining)}</td>
                           <td>
@@ -589,7 +591,7 @@ export default function DelegateDetailPage() {
                       )
                     })}
                     {d.invoices.filter(i => i.type === 'sale' && i.status !== 'paid').length === 0 && (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>لا توجد فواتير معلقة</td></tr>
+                      <tr><td colSpan={isMobile ? 4 : 5} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>لا توجد فواتير معلقة</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -612,7 +614,7 @@ export default function DelegateDetailPage() {
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>التاريخ</th><th>النوع</th><th>الوصف</th><th>المرجع</th><th>المبلغ</th><th>الرصيد بعد</th></tr>
+                    <tr><th>التاريخ</th>{!isMobile && <th>النوع</th>}<th>{isMobile ? 'البيان' : 'الوصف'}</th>{!isMobile && <th>المرجع</th>}<th>المبلغ</th><th>الرصيد بعد</th></tr>
                   </thead>
                   <tbody>
                     {d.transactions.map(tx => {
@@ -620,9 +622,13 @@ export default function DelegateDetailPage() {
                       return (
                         <tr key={tx.id}>
                           <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(tx.date)}</td>
-                          <td><span style={{ background: t.color + '18', color: t.color, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><i className={`fa ${t.icon}`} style={{ marginLeft: 4 }} />{t.label}</span></td>
+                          {!isMobile && (
+                            <td><span style={{ background: t.color + '18', color: t.color, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}><i className={`fa ${t.icon}`} style={{ marginLeft: 4 }} />{t.label}</span></td>
+                          )}
                           <td style={{ fontSize: 12 }}>{tx.description}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted)' }}>{tx.reference ?? '—'}</td>
+                          {!isMobile && (
+                            <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted)' }}>{tx.reference ?? '—'}</td>
+                          )}
                           <td style={{ fontWeight: 700, color: tx.amount >= 0 ? 'var(--success)' : 'var(--danger)' }}>{tx.amount >= 0 ? '+' : ''}{fmt(tx.amount)}</td>
                           <td style={{ fontWeight: 700 }}>{fmt(tx.balanceAfter)}</td>
                         </tr>

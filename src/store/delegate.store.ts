@@ -12,29 +12,57 @@ import { useTreasuryStore } from './treasury.store'
 import { useInventoryStore } from './inventory.store'
 import { useCustomerStore } from './customer.store'
 
+interface WarehouseTransfer {
+  id: string
+  productId: string
+  productName: string
+  productSku: string
+  qty: number
+  costPrice: number
+  date: string
+  type: 'in' | 'out' // in = from company, out = return to company
+  source: 'company' | 'purchase' | 'sale' | 'return'
+}
+
 interface DelegateStore {
   delegates: Delegate[]
   loading: boolean
   error: string | null
 
   fetch: () => Promise<void>
-  addDelegate: (data: { name: string; phone: string; email: string; zone: string; username?: string; password?: string }) => Promise<Delegate>
+  addDelegate: (data: { name: string; phone: string; email: string; zone: string; username?: string; password?: string; baseSalary?: number; commissionRate?: number }) => Promise<Delegate>
   setDelegateStatus: (delegateId: string, status: 'active' | 'inactive') => Promise<void>
+
+  // Invoice operations
   addInvoice: (delegateId: string, invoice: Omit<DelegateInvoice, 'id' | 'number'>) => Promise<DelegateInvoice>
   updateInvoiceStatus: (delegateId: string, invoiceId: string, status: DelegateInvoice['status']) => Promise<void>
   payDelegateInvoice: (delegateId: string, invoiceId: string, amount: number) => Promise<void>
   confirmDelegateInvoice: (delegateId: string, invoiceId: string) => Promise<{ success: boolean; failedItem?: string }>
+  voidDelegateInvoice: (delegateId: string, invoiceId: string, reason?: string) => Promise<void>
+
+  // Financial operations
   addCollectionTransaction: (delegateId: string, amount: number, description: string, reference?: string) => Promise<void>
-  deductFromWarehouse: (delegateId: string, productId: string, qty: number) => boolean
-  addToWarehouse: (delegateId: string, item: Omit<DelegateWarehouseItem, 'id' | 'status'>) => Promise<void>
   withdrawFromDelegate: (delegateId: string, amount: number, description: string) => Promise<void>
-  getAggregatedWarehouse: (delegateId: string) => { productId: string; productName: string; productSku: string; received: number; sold: number; available: number }[]
-  transferToMainWarehouse: (delegateId: string, productId: string, qty: number) => Promise<void>
   remitToCompany: (delegateId: string, amount: number, description: string) => Promise<void>
   resetDelegateData: (delegateId: string) => Promise<void>
-  voidDelegateInvoice: (delegateId: string, invoiceId: string, reason?: string) => Promise<void>
-  validateLogin: (username: string, password: string) => Delegate | null
+
+  // NEW Warehouse operations
+  getDelegateStock: (delegateId: string, productId: string) => number
+  getAvailableStock: (delegateId: string, productId: string) => number
+  transferFromMainWarehouse: (delegateId: string, productId: string, qty: number) => Promise<void>
+  returnToMainWarehouse: (delegateId: string, productId: string, qty: number) => Promise<void>
+  addPurchaseToWarehouse: (delegateId: string, items: { productId: string; productName: string; productSku?: string; qty: number; costPrice: number }[]) => Promise<void>
+
+  // Salary operations
+  updateDelegateSalary: (delegateId: string, baseSalary: number, commissionRate: number) => Promise<void>
+
+  // Legacy support
+  deductFromWarehouse: (delegateId: string, productId: string, qty: number) => boolean
+  addToWarehouse: (delegateId: string, item: Omit<DelegateWarehouseItem, 'id' | 'status'>) => Promise<void>
   setWarehouseQty: (delegateId: string, warehouseItemId: string, newQty: number) => void
+
+  // Auth
+  validateLogin: (username: string, password: string) => Delegate | null
 }
 
 function generateUsername(name: string): string {
@@ -58,7 +86,6 @@ export const useDelegateStore = create<DelegateStore>()(
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
         try {
-          // Fetch everything in parallel — 5 requests total (not 4×N)
           const [data, whAll, invAll, txAll, itemsAll] = await Promise.all([
             supaFetch('delegates', { select: '*', limit: 200 }),
             supaFetch('delegate_warehouse', { select: '*', limit: 5000 }).catch(() => []),
@@ -68,7 +95,6 @@ export const useDelegateStore = create<DelegateStore>()(
           ])
           if (!Array.isArray(data) || data.length === 0) { set({ loading: false }); return }
 
-          // Group related data by their parent ID
           const whByDelegate: Record<string, any[]> = {}
           for (const w of (whAll || [])) {
             if (!whByDelegate[w.delegate_id]) whByDelegate[w.delegate_id] = []
@@ -90,42 +116,19 @@ export const useDelegateStore = create<DelegateStore>()(
             itemsByInvoice[it.invoice_id].push(it)
           }
 
-          // Preserve local data so fetch() doesn't duplicate or revert it
-          const currentDelegates = get().delegates
-          const localInvoices = new Map<string, DelegateInvoice>()
-          const localWarehouses = new Map<string, DelegateWarehouseItem[]>()
-          for (const d of currentDelegates) {
-            localWarehouses.set(d.id, d.warehouse)
-            for (const inv of d.invoices) {
-              if (inv.status === 'confirmed' || inv.status === 'paid') {
-                localInvoices.set(inv.id, inv)
-              }
-            }
-          }
-
           const delegates = data.map((d: any): Delegate => {
-            const localWh = localWarehouses.get(d.id)
-            // Use local warehouse if present (to avoid duplication from addToWarehouse + fetch race)
-            const warehouse = (localWh && localWh.length > 0)
-              ? localWh
-              : (whByDelegate[d.id] || []).map((w: any): DelegateWarehouseItem => ({
-                  id: w.id, productId: w.product_id, productName: w.product_name, productSku: w.product_sku || '',
-                  qty: w.qty, costPrice: Number(w.cost_price) || 0, receivedDate: w.received_date,
-                  status: w.status, source: w.source,
-                }))
             return {
               id: d.id, name: d.name, phone: d.phone || '', email: d.email || '',
               zone: d.zone || '', status: d.status, username: d.username, password: d.password_hash,
               avatar: d.avatar || d.name.split(' ').slice(0, 2).map((w: string) => w[0]).join(''),
               location: { lat: d.location_lat || 24.7136, lng: d.location_lng || 46.6753, address: d.location_address || 'غير محدد', timestamp: new Date().toISOString() },
               locationHistory: [],
-              warehouse,
-            invoices: (invByDelegate[d.id] || []).map((i: any): DelegateInvoice => {
-              const local = localInvoices.get(i.id)
-              if (local && (local.status === 'confirmed' || local.status === 'paid')) {
-                return local
-              }
-              return {
+              warehouse: (whByDelegate[d.id] || []).map((w: any): DelegateWarehouseItem => ({
+                id: w.id, productId: w.product_id, productName: w.product_name, productSku: w.product_sku || '',
+                qty: w.qty, costPrice: Number(w.cost_price) || 0, receivedDate: w.received_date,
+                status: w.status, source: w.source,
+              })),
+              invoices: (invByDelegate[d.id] || []).map((i: any): DelegateInvoice => ({
                 id: i.id, number: i.number, date: i.date, type: i.type, party: i.party,
                 customerId: i.customer_id,
                 items: (itemsByInvoice[i.id] || []).map((it: any) => ({
@@ -138,23 +141,24 @@ export const useDelegateStore = create<DelegateStore>()(
                 subtotal: Number(i.subtotal) || 0, tax: Number(i.tax) || 0, total: Number(i.total) || 0,
                 paidAmount: Number(i.paid_amount) || 0, status: i.status,
                 paymentMethod: i.payment_method, confirmedAt: i.confirmed_at,
-              }
-            }),
-            transactions: (txByDelegate[d.id] || []).map((t: any): DelegateTransaction => ({
-              id: t.id, date: t.date, type: t.type, amount: Number(t.amount) || 0,
-              description: t.description || '', reference: t.reference,
-              balanceAfter: Number(t.balance_after) || 0,
-            })),
-            stats: {
-              totalSales: Number(d.stats_total_sales) || 0,
-              totalPurchases: Number(d.stats_total_purchases) || 0,
-              collected: Number(d.stats_collected) || 0,
-              balance: Number(d.stats_balance) || 0,
-              externalCredit: Number(d.stats_external_credit) || 0,
-              expenses: Number(d.stats_expenses) || 0,
-              companyEntrusted: Number(d.stats_company_entrusted) || 0,
+              })),
+              transactions: (txByDelegate[d.id] || []).map((t: any): DelegateTransaction => ({
+                id: t.id, date: t.date, type: t.type, amount: Number(t.amount) || 0,
+                description: t.description || '', reference: t.reference,
+                balanceAfter: Number(t.balance_after) || 0,
+              })),
+              stats: {
+                totalSales: Number(d.stats_total_sales) || 0,
+                totalPurchases: Number(d.stats_total_purchases) || 0,
+                collected: Number(d.stats_collected) || 0,
+                balance: Number(d.stats_balance) || 0,
+                externalCredit: Number(d.stats_external_credit) || 0,
+                expenses: Number(d.stats_expenses) || 0,
+                companyEntrusted: Number(d.stats_company_entrusted) || 0,
+              },
+              baseSalary: Number(d.base_salary) || 4000,
+              commissionRate: Number(d.commission_rate) || 5,
             }
-          }
           })
           set({ delegates, loading: false })
         } catch (e: any) {
@@ -162,10 +166,8 @@ export const useDelegateStore = create<DelegateStore>()(
         }
       },
 
-      async addDelegate({ name, phone, email, zone, username, password }) {
-        // Use timestamp-based ID to avoid conflicts
+      async addDelegate({ name, phone, email, zone, username, password, baseSalary, commissionRate }) {
         const id = `DEL-${Date.now()}`
-
         const avatar = name.split(' ').slice(0, 2).map(w => w[0]).join('')
         const finalUsername = username?.trim() || generateUsername(name)
         const finalPassword = password || generatePassword()
@@ -179,6 +181,8 @@ export const useDelegateStore = create<DelegateStore>()(
           locationHistory: [],
           warehouse: [], invoices: [], transactions: [],
           stats: { totalSales: 0, totalPurchases: 0, collected: 0, balance: 0, externalCredit: 0, expenses: 0, companyEntrusted: 0 },
+          baseSalary: baseSalary || 4000,
+          commissionRate: commissionRate || 5,
         }
 
         if (isSupabaseConfigured()) {
@@ -193,6 +197,8 @@ export const useDelegateStore = create<DelegateStore>()(
               password_hash: finalPassword,
               avatar,
               status: 'active',
+              base_salary: baseSalary || 4000,
+              commission_rate: commissionRate || 5,
             },
             select: 'id',
           })
@@ -212,20 +218,205 @@ export const useDelegateStore = create<DelegateStore>()(
       },
 
       validateLogin(username, password) {
-        // Check local store first (already fetched)
         const local = get().delegates.find(d => d.username === username && d.password === password)
         if (local) return local
-        // Also check with trimmed values in case of whitespace
         return get().delegates.find(d =>
           d.username?.trim() === username?.trim() &&
           d.password?.trim() === password?.trim()
         ) || null
       },
 
+      // ========== WAREHOUSE CALCULATIONS ==========
+      getDelegateStock(delegateId, productId) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return 0
+        // Total stock = company transfers + purchases
+        return delegate.warehouse
+          .filter(w => w.productId === productId)
+          .reduce((s, w) => s + w.qty, 0)
+      },
+
+      getAvailableStock(delegateId, productId) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return 0
+        // Total stock
+        const totalStock = get().getDelegateStock(delegateId, productId)
+        // Deduct confirmed/paid sales
+        const sold = delegate.invoices
+          .filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
+          .reduce((s, inv) => {
+            const itemQty = inv.items.find(it => it.productId === productId)?.qty || 0
+            return s + itemQty
+          }, 0)
+        return Math.max(0, totalStock - sold)
+      },
+
+      async transferFromMainWarehouse(delegateId, productId, qty) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) throw new Error('المندوب غير موجود')
+
+        // Check main inventory
+        const mainStock = useInventoryStore.getState().getProductStock(productId)
+        if (mainStock < qty) throw new Error(`الكمية غير متوفرة في المخزون الرئيسي. المتاح: ${mainStock}`)
+
+        const product = useInventoryStore.getState().products.find(p => p.id === productId)
+        const productName = product?.name || 'غير معروف'
+        const productSku = product?.sku || ''
+        const costPrice = product?.costPrice || 0
+
+        // Deduct from main warehouse
+        await useInventoryStore.getState().transferToDelegate(productId, delegateId, qty)
+
+        // Add to delegate warehouse
+        const today = new Date().toISOString().slice(0, 10)
+        if (isSupabaseConfigured()) {
+          await supabase.from('delegate_warehouse').insert({
+            delegate_id: delegateId,
+            product_id: productId,
+            product_name: productName,
+            product_sku: productSku,
+            qty,
+            cost_price: costPrice,
+            received_date: today,
+            status: 'in-stock',
+            source: 'company',
+          })
+        }
+
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            // Check if product already exists in warehouse
+            const existing = d.warehouse.find(w => w.productId === productId && w.source === 'company')
+            if (existing) {
+              return {
+                ...d,
+                warehouse: d.warehouse.map(w =>
+                  w.id === existing.id ? { ...w, qty: w.qty + qty } : w
+                ),
+                stats: { ...d.stats, companyEntrusted: d.stats.companyEntrusted + (qty * costPrice) }
+              }
+            }
+            const newItem: DelegateWarehouseItem = {
+              id: `WH-${Date.now()}`,
+              productId,
+              productName,
+              productSku,
+              qty,
+              costPrice,
+              receivedDate: today,
+              status: 'in-stock',
+              source: 'company',
+            }
+            return {
+              ...d,
+              warehouse: [...d.warehouse, newItem],
+              stats: { ...d.stats, companyEntrusted: d.stats.companyEntrusted + (qty * costPrice) }
+            }
+          })
+        }))
+      },
+
+      async returnToMainWarehouse(delegateId, productId, qty) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) throw new Error('المندوب غير موجود')
+
+        // Check available stock
+        const available = get().getAvailableStock(delegateId, productId)
+        if (available < qty) throw new Error(`الكمية المتاحة للسحب: ${available} فقط`)
+
+        // Add back to main warehouse
+        await useInventoryStore.getState().returnFromDelegate(productId, delegateId, qty)
+
+        // Deduct from delegate warehouse
+        if (isSupabaseConfigured()) {
+          const whItems = delegate.warehouse.filter(w => w.productId === productId)
+          let remaining = qty
+          for (const item of whItems) {
+            if (remaining <= 0) break
+            const deduct = Math.min(item.qty, remaining)
+            remaining -= deduct
+            const newQty = item.qty - deduct
+            await supaFetch('delegate_warehouse', {
+              method: 'PATCH',
+              filter: `id=eq.${item.id}`,
+              body: { qty: newQty, status: newQty <= 0 ? 'transferred' : 'in-stock' },
+            })
+          }
+        }
+
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            let remaining = qty
+            const updatedWarehouse = d.warehouse.map(w => {
+              if (w.productId !== productId || remaining <= 0) return w
+              const deduct = Math.min(w.qty, remaining)
+              remaining -= deduct
+              return { ...w, qty: w.qty - deduct }
+            }).filter(w => w.qty > 0)
+            const returnedValue = qty * (d.warehouse.find(w => w.productId === productId)?.costPrice || 0)
+            return {
+              ...d,
+              warehouse: updatedWarehouse,
+              stats: { ...d.stats, companyEntrusted: Math.max(0, d.stats.companyEntrusted - returnedValue) }
+            }
+          })
+        }))
+      },
+
+      async addPurchaseToWarehouse(delegateId, items) {
+        const delegate = get().delegates.find(d => d.id === delegateId)
+        if (!delegate) return
+
+        const today = new Date().toISOString().slice(0, 10)
+
+        for (const item of items) {
+          if (!item.productId || item.qty <= 0) continue
+
+          if (isSupabaseConfigured()) {
+            await supabase.from('delegate_warehouse').insert({
+              delegate_id: delegateId,
+              product_id: item.productId,
+              product_name: item.productName,
+              product_sku: item.productSku || '',
+              qty: item.qty,
+              cost_price: item.costPrice,
+              received_date: today,
+              status: 'in-stock',
+              source: 'purchased',
+            })
+          }
+        }
+
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            const newItems: DelegateWarehouseItem[] = items
+              .filter(it => it.productId && it.qty > 0)
+              .map(it => ({
+                id: `WH-${Date.now()}-${it.productId}`,
+                productId: it.productId,
+                productName: it.productName,
+                productSku: it.productSku || '',
+                qty: it.qty,
+                costPrice: it.costPrice,
+                receivedDate: today,
+                status: 'in-stock',
+                source: 'purchased',
+              }))
+            return {
+              ...d,
+              warehouse: [...d.warehouse, ...newItems],
+            }
+          })
+        }))
+      },
+
+      // ========== INVOICE OPERATIONS ==========
       async addInvoice(delegateId, invoice) {
         const year = new Date().getFullYear()
         const prefix = `D-${year}-`
-        // Get real max from Supabase to avoid duplicates
         let seq = (get().delegates.find(d => d.id === delegateId)?.invoices.length || 0) + 1
         if (isSupabaseConfigured()) {
           try {
@@ -254,25 +445,14 @@ export const useDelegateStore = create<DelegateStore>()(
         }
 
         // If purchase: add items to delegate warehouse
-        if (invoice.type === 'purchase' && isSupabaseConfigured()) {
-          const today = new Date().toISOString().slice(0, 10)
-          for (const item of invoice.items) {
-            if (!item.productId || item.qty <= 0) continue
-            await supaFetch('delegate_warehouse', {
-              method: 'POST',
-              body: {
-                delegate_id: delegateId,
-                product_id: item.productId || null,
-                product_name: item.description,
-                product_sku: '',
-                qty: item.qty,
-                cost_price: item.price,
-                received_date: today,
-                status: 'in-stock',
-                source: 'purchased',
-              },
-            })
-          }
+        if (invoice.type === 'purchase') {
+          await get().addPurchaseToWarehouse(delegateId, invoice.items.map(it => ({
+            productId: it.productId || `PROD-${Date.now()}`,
+            productName: it.description,
+            productSku: '',
+            qty: it.qty,
+            costPrice: it.price,
+          })))
         }
 
         set(state => ({
@@ -281,21 +461,7 @@ export const useDelegateStore = create<DelegateStore>()(
             const totalSales = d.stats.totalSales + (invoice.type === 'sale' ? invoice.total : 0)
             const totalPurchases = d.stats.totalPurchases + (invoice.type === 'purchase' ? invoice.total : 0)
             const externalCredit = invoice.type === 'sale' && invoice.status !== 'paid' ? d.stats.externalCredit + invoice.total : d.stats.externalCredit
-            // Add to local warehouse for purchases
-            const newWarehouse = invoice.type === 'purchase'
-              ? [...d.warehouse, ...invoice.items.filter(it => it.productId && it.qty > 0).map(it => ({
-                  id: `WH-${Date.now()}-${it.productId}`,
-                  productId: it.productId!,
-                  productName: it.description,
-                  productSku: '',
-                  qty: it.qty,
-                  costPrice: it.price,
-                  receivedDate: new Date().toISOString().slice(0, 10),
-                  status: 'in-stock' as const,
-                  source: 'purchased' as const,
-                }))]
-              : d.warehouse
-            return { ...d, invoices: [newInvoice, ...d.invoices], warehouse: newWarehouse, stats: { ...d.stats, totalSales, totalPurchases, externalCredit } }
+            return { ...d, invoices: [newInvoice, ...d.invoices], stats: { ...d.stats, totalSales, totalPurchases, externalCredit } }
           }),
         }))
         return newInvoice
@@ -342,58 +508,27 @@ export const useDelegateStore = create<DelegateStore>()(
         if (!invoice) return { success: false, failedItem: 'الفاتورة غير موجودة' }
         if (invoice.type !== 'sale') return { success: false, failedItem: 'التأكيد للمبيعات فقط' }
         if (invoice.status === 'confirmed' || invoice.status === 'paid') return { success: false, failedItem: 'الفاتورة مؤكدة بالفعل' }
+
+        // Check available stock BEFORE confirming
         for (const item of invoice.items) {
           if (!item.productId) continue
-          const whItem = delegate.warehouse.find(w => w.productId === item.productId && w.status === 'in-stock')
-          if (!whItem || whItem.qty < item.qty) return { success: false, failedItem: item.description }
+          const available = get().getAvailableStock(delegateId, item.productId)
+          if (available < item.qty) return { success: false, failedItem: item.description }
         }
+
+        // Mark as confirmed
         set(state => ({
           delegates: state.delegates.map(d => {
             if (d.id !== delegateId) return d
-            let warehouse = [...d.warehouse]
-            for (const item of invoice.items) {
-              if (!item.productId) continue
-              let remaining = item.qty
-              warehouse = warehouse.map(w => {
-                if (w.productId !== item.productId || w.status !== 'in-stock' || remaining <= 0) return w
-                const deduct = Math.min(w.qty, remaining)
-                remaining -= deduct
-                const newQty = w.qty - deduct
-                return newQty <= 0 ? { ...w, qty: 0, status: 'transferred' as const } : { ...w, qty: newQty }
-              }).filter(w => w.qty > 0 || w.status !== 'transferred')
-            }
             return {
-              ...d, warehouse,
+              ...d,
               invoices: d.invoices.map(inv => inv.id === invoiceId ? { ...inv, status: 'confirmed' as const, confirmedAt: new Date().toISOString().slice(0, 10) } : inv),
             }
           }),
         }))
 
-        // Now persist to Supabase AFTER local state update
+        // Sync to Supabase
         if (isSupabaseConfigured()) {
-          const updatedDelegate = get().delegates.find(d => d.id === delegateId)
-          // Update each warehouse item in Supabase
-          if (updatedDelegate) {
-            const allWarehouse = await supaFetch('delegate_warehouse', { filter: `delegate_id=eq.${delegateId}`, limit: 500 })
-            for (const item of invoice.items) {
-              if (!item.productId) continue
-              // Find all warehouse rows for this product and update qty proportionally
-              const whRows = (allWarehouse || []).filter((w: any) => w.product_id === item.productId && w.status === 'in-stock')
-              let remaining = item.qty
-              for (const row of whRows) {
-                if (remaining <= 0) break
-                const deduct = Math.min(row.qty, remaining)
-                remaining -= deduct
-                const newQty = row.qty - deduct
-                await supaFetch('delegate_warehouse', {
-                  method: 'PATCH',
-                  filter: `id=eq.${row.id}`,
-                  body: { qty: newQty, status: newQty <= 0 ? 'transferred' : 'in-stock' },
-                })
-              }
-            }
-          }
-          // Update invoice status
           await supaFetch('delegate_invoices', {
             method: 'PATCH',
             filter: `id=eq.${invoiceId}`,
@@ -421,42 +556,6 @@ export const useDelegateStore = create<DelegateStore>()(
         }))
       },
 
-      deductFromWarehouse(delegateId, productId, qty) {
-        let success = false
-        set(state => ({
-          delegates: state.delegates.map(d => {
-            if (d.id !== delegateId) return d
-            const item = d.warehouse.find(w => w.productId === productId && w.status === 'in-stock')
-            if (!item || item.qty < qty) return d
-            success = true
-            return { ...d, warehouse: d.warehouse.map(w => w.id !== item.id ? w : { ...w, qty: w.qty - qty }).filter(w => w.qty > 0 || w.status !== 'transferred') }
-          }),
-        }))
-        return success
-      },
-
-      async addToWarehouse(delegateId, item) {
-        if (isSupabaseConfigured()) {
-          await supabase.from('delegate_warehouse').insert({
-            delegate_id: delegateId, product_id: item.productId || null,
-            product_name: item.productName, product_sku: item.productSku,
-            qty: item.qty, cost_price: item.costPrice, received_date: item.receivedDate,
-            status: 'in-stock', source: item.source || 'purchased',
-          })
-        }
-        set(state => ({
-          delegates: state.delegates.map(d => {
-            if (d.id !== delegateId) return d
-            const existing = d.warehouse.find(w => w.productId === item.productId && w.status === 'in-stock' && (w.source ?? 'purchased') === (item.source ?? 'purchased'))
-            if (existing) {
-              return { ...d, warehouse: d.warehouse.map(w => w.id === existing.id ? { ...w, qty: w.qty + item.qty } : w) }
-            }
-            const newItem: DelegateWarehouseItem = { ...item, id: `WH-${Date.now()}`, status: 'in-stock' }
-            return { ...d, warehouse: [...d.warehouse, newItem] }
-          }),
-        }))
-      },
-
       async withdrawFromDelegate(delegateId, amount, description) {
         if (isSupabaseConfigured()) {
           const delegate = get().delegates.find(d => d.id === delegateId)
@@ -471,75 +570,6 @@ export const useDelegateStore = create<DelegateStore>()(
             if (d.id !== delegateId) return d
             const tx: DelegateTransaction = { id: `TRX-${Date.now()}`, date: new Date().toISOString().slice(0, 10), type: 'withdrawal', amount: -amount, description, reference: `WD-${Date.now()}`, balanceAfter: d.stats.balance - amount }
             return { ...d, transactions: [tx, ...d.transactions], stats: { ...d.stats, balance: d.stats.balance - amount } }
-          }),
-        }))
-      },
-
-      getAggregatedWarehouse(delegateId) {
-        const delegate = get().delegates.find(d => d.id === delegateId)
-        if (!delegate) return []
-
-        // Step 1: current available qty per product (warehouse already has deductions applied)
-        const currentQty: Record<string, { productId: string; productName: string; productSku: string; available: number }> = {}
-        for (const item of delegate.warehouse) {
-          if (!currentQty[item.productId]) {
-            currentQty[item.productId] = { productId: item.productId, productName: item.productName, productSku: item.productSku || '', available: 0 }
-          }
-          currentQty[item.productId].available += item.qty
-        }
-
-        // Step 2: sold qty from confirmed/paid sale invoices
-        const soldQty: Record<string, number> = {}
-        for (const inv of delegate.invoices) {
-          if (inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid')) {
-            for (const it of inv.items) {
-              if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + it.qty
-            }
-          }
-        }
-
-        // Step 3: merge — products may appear in invoices but be fully gone from warehouse
-        const allKeys = new Set([...Object.keys(currentQty), ...Object.keys(soldQty)])
-        return Array.from(allKeys).map(key => {
-          const info = currentQty[key] || { productId: key, productName: key, productSku: '', available: 0 }
-          const sold = soldQty[key] || 0
-          return {
-            productId: info.productId,
-            productName: info.productName,
-            productSku: info.productSku,
-            available: info.available,          // current stock (already deducted)
-            sold,                               // from confirmed invoice items
-            received: info.available + sold,    // historical total = current + sold
-          }
-        })
-      },
-
-      async transferToMainWarehouse(delegateId, productId, qty) {
-        const delegate = get().delegates.find(d => d.id === delegateId)
-        if (!delegate) return
-        let remaining = qty
-        const itemsToUpdate = delegate.warehouse.filter(w => w.productId === productId && w.qty > 0)
-        for (const item of itemsToUpdate) {
-          if (remaining <= 0) break
-          const deduct = Math.min(remaining, item.qty)
-          remaining -= deduct
-          if (isSupabaseConfigured()) {
-            await supabase.from('delegate_warehouse').update({ qty: item.qty - deduct }).eq('id', item.id)
-          }
-        }
-        // Sync back to main inventory
-        await useInventoryStore.getState().addStock(productId, qty, `delegate_return_${delegateId}`)
-        set(state => ({
-          delegates: state.delegates.map(d => {
-            if (d.id !== delegateId) return d
-            let rem = qty
-            const updatedWarehouse = d.warehouse.map(w => {
-              if (w.productId !== productId || rem <= 0) return w
-              const deduct = Math.min(rem, w.qty)
-              rem -= deduct
-              return { ...w, qty: w.qty - deduct }
-            }).filter(w => w.qty > 0)
-            return { ...d, warehouse: updatedWarehouse }
           }),
         }))
       },
@@ -596,18 +626,6 @@ export const useDelegateStore = create<DelegateStore>()(
         }))
       },
 
-      setWarehouseQty(delegateId, warehouseItemId, newQty) {
-        set(state => ({
-          delegates: state.delegates.map(d => {
-            if (d.id !== delegateId) return d
-            return {
-              ...d,
-              warehouse: d.warehouse.map(w => w.id === warehouseItemId ? { ...w, qty: Math.max(0, newQty) } : w)
-            }
-          }),
-        }))
-      },
-
       async voidDelegateInvoice(delegateId, invoiceId, reason) {
         const delegate = get().delegates.find(d => d.id === delegateId)
         if (!delegate) return
@@ -617,19 +635,9 @@ export const useDelegateStore = create<DelegateStore>()(
 
         // Reverse stock for confirmed/paid sale invoices
         if (invoice.type === 'sale' && (invoice.status === 'confirmed' || invoice.status === 'paid')) {
-          for (const item of invoice.items) {
-            if (item.productId) {
-              await get().addToWarehouse(delegateId, {
-                productId: item.productId,
-                productName: item.description,
-                productSku: (item as any).sku || '',
-                qty: item.qty,
-                costPrice: item.price,
-                source: 'company',
-                receivedDate: new Date().toISOString().slice(0, 10),
-              })
-            }
-          }
+          // Stock is already "virtually" deducted, confirming again would be wrong
+          // Since we use available stock calculation, voiding just marks it as draft
+          // The available stock will automatically increase
         }
 
         // Reverse customer balance for credit sales
@@ -667,7 +675,70 @@ export const useDelegateStore = create<DelegateStore>()(
           }).eq('id', invoiceId)
         }
       },
+
+      async updateDelegateSalary(delegateId, baseSalary, commissionRate) {
+        if (isSupabaseConfigured()) {
+          await supaFetch('delegates', {
+            method: 'PATCH',
+            filter: `id=eq.${delegateId}`,
+            body: { base_salary: baseSalary, commission_rate: commissionRate }
+          })
+        }
+        set(state => ({
+          delegates: state.delegates.map(d =>
+            d.id === delegateId ? { ...d, baseSalary, commissionRate } : d
+          )
+        }))
+      },
+
+      deductFromWarehouse(delegateId, productId, qty) {
+        let success = false
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            const item = d.warehouse.find(w => w.productId === productId && w.status === 'in-stock')
+            if (!item || item.qty < qty) return d
+            success = true
+            return { ...d, warehouse: d.warehouse.map(w => w.id !== item.id ? w : { ...w, qty: w.qty - qty }).filter(w => w.qty > 0 || w.status !== 'transferred') }
+          }),
+        }))
+        return success
+      },
+
+      async addToWarehouse(delegateId, item) {
+        if (isSupabaseConfigured()) {
+          await supabase.from('delegate_warehouse').insert({
+            delegate_id: delegateId, product_id: item.productId || null,
+            product_name: item.productName, product_sku: item.productSku,
+            qty: item.qty, cost_price: item.costPrice, received_date: item.receivedDate,
+            status: 'in-stock', source: item.source || 'purchased',
+          })
+        }
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            const existing = d.warehouse.find(w => w.productId === item.productId && w.status === 'in-stock' && (w.source ?? 'purchased') === (item.source ?? 'purchased'))
+            if (existing) {
+              return { ...d, warehouse: d.warehouse.map(w => w.id === existing.id ? { ...w, qty: w.qty + item.qty } : w) }
+            }
+            const newItem: DelegateWarehouseItem = { ...item, id: `WH-${Date.now()}`, status: 'in-stock' }
+            return { ...d, warehouse: [...d.warehouse, newItem] }
+          }),
+        }))
+      },
+
+      setWarehouseQty(delegateId, warehouseItemId, newQty) {
+        set(state => ({
+          delegates: state.delegates.map(d => {
+            if (d.id !== delegateId) return d
+            return {
+              ...d,
+              warehouse: d.warehouse.map(w => w.id === warehouseItemId ? { ...w, qty: Math.max(0, newQty) } : w)
+            }
+          }),
+        }))
+      },
     }),
-    { name: 'sahl-delegates-v8' }
+    { name: 'sahl-delegates-v9' }
   )
 )

@@ -80,10 +80,19 @@ const S = (C: React.ComponentType) => (
 
 function AppDataProvider() {
   const initAuth = useAuthStore(s => s.initAuth)
+  const checkPasswordVersion = useAuthStore(s => s.checkPasswordVersion)
+  const logout = useAuthStore(s => s.logout)
 
   useEffect(() => {
     // Init Supabase auth listener — handles session restore on refresh automatically
     const unsubscribe = initAuth()
+
+    // Check password version - if changed on another device, force logout
+    if (!checkPasswordVersion()) {
+      logout()
+      window.location.href = '/'
+      return
+    }
 
     // Fetch all data if Supabase is configured
     if (isSupabaseConfigured()) {
@@ -99,7 +108,7 @@ function AppDataProvider() {
     }
 
     return unsubscribe
-  }, [initAuth])
+  }, [initAuth, checkPasswordVersion, logout])
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return

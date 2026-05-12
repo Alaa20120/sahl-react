@@ -7,7 +7,6 @@ import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/store/auth.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useInventoryStore } from '@/store/inventory.store'
-import { PRODUCTS } from '@/lib/mock-data/inventory'
 
 const INV_STATUS: Record<string, { label: string; css: string }> = {
   paid:      { label: 'مدفوعة',   css: 'status-active' },
@@ -25,6 +24,7 @@ export default function DelegateInvoicesPage() {
   const delegates = useDelegateStore(s => s.delegates)
   const confirmDelegateInvoice = useDelegateStore(s => s.confirmDelegateInvoice)
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
+  const products = useInventoryStore(s => s.products)
   const delegate = useMemo(() => delegates.find(d => d.id === delegateId), [delegates, delegateId])
   const invoices = delegate?.invoices ?? []
 
@@ -41,7 +41,7 @@ export default function DelegateInvoicesPage() {
     const inv = invoices.find(i => i.id === id)
     try {
       if (inv) {
-        const catalogItems = (inv.items ?? []).filter((it: any) => it.productId && PRODUCTS.some((p: any) => p.id === it.productId))
+        const catalogItems = (inv.items ?? []).filter((it: any) => it.productId && products.some((p: any) => p.id === it.productId))
         if (catalogItems.length > 0) await deductFromInventory(catalogItems.map((it: any) => ({ productId: it.productId, qty: it.qty })))
       }
       toast('تم تأكيد التسليم وخصم المخزون', 'success')

@@ -85,6 +85,8 @@ export interface Delegate {
   invoices: DelegateInvoice[]
   transactions: DelegateTransaction[]
   stats: DelegateStats
+  baseSalary?: number
+  commissionRate?: number
 }
 
 export const DELEGATES: Delegate[] = []

@@ -84,7 +84,7 @@ export const useExpenseStore = create<ExpenseStore>()(
               date: expense.date,
               description: `${expense.type === 'advance' ? 'سلفة' : 'مصروف'} - ${expense.category} - ${expense.employee}`,
               type: 'out',
-              category: 'expense',
+              category: expense.type === 'advance' ? 'salary' : 'expense',
               amount: expense.amount,
               account: 'cash',
               ref: id,

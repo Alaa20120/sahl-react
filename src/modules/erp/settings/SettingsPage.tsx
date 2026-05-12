@@ -4,6 +4,7 @@ import Card from '@/components/ui/Card'
 import { toast } from '@/lib/toast'
 import { useAppStore } from '@/store/app.store'
 import { useInventoryStore } from '@/store/inventory.store'
+import { useAuthStore } from '@/store/auth.store'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 
 // Delete order respects FK dependencies (child → parent)
@@ -19,7 +20,7 @@ const RESET_TABLES = [
   'categories',
 ]
 
-const TABS = ['الشركة', 'الفواتير', 'الضريبة', 'الإشعارات', 'النسخ الاحتياطي']
+const TABS = ['الشركة', 'الفواتير', 'الضريبة', 'الإشعارات', 'النسخ الاحتياطي', 'الحساب']
 
 export default function SettingsPage() {
   const storeCompany = useAppStore(s => s.company)
@@ -29,6 +30,47 @@ export default function SettingsPage() {
 
   const [tab, setTab] = useState('الشركة')
   const [resetting, setResetting] = useState(false)
+
+  // Password change state
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const changePassword = useAuthStore(s => s.changePassword)
+  const logout = useAuthStore(s => s.logout)
+
+  async function handleChangePassword() {
+    setPasswordError('')
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setPasswordError('يرجى ملء جميع الحقول')
+      return
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('كلمتا المرور الجديدتان غير متطابقتين')
+      return
+    }
+    setChangingPassword(true)
+    const result = await changePassword(oldPassword, newPassword)
+    setChangingPassword(false)
+    if (result.success) {
+      toast(result.message, 'success')
+      setOldPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      // Force logout after password change
+      setTimeout(() => {
+        logout()
+        window.location.href = '/'
+      }, 2000)
+    } else {
+      setPasswordError(result.message)
+    }
+  }
 
   async function handleFullReset() {
     if (!window.confirm('⚠️ سيتم حذف جميع البيانات (فواتير، عملاء، مخزون، مشتريات...) بشكل نهائي لا يمكن التراجع عنه. هل أنت متأكد؟')) return
@@ -363,6 +405,62 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'الحساب' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
+          <Card title="تغيير كلمة المرور">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ background: 'var(--blue-light)', borderRadius: 8, padding: '12px 16px', fontSize: 12, color: 'var(--blue)' }}>
+                <i className="fa fa-info-circle" style={{ marginLeft: 6 }} />
+                عند تغيير كلمة المرور، سيتم تسجيل خروجك من جميع الأجهزة الأخرى تلقائياً.
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>كلمة المرور الحالية</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  placeholder="أدخل كلمة المرور الحالية"
+                  value={oldPassword}
+                  onChange={e => setOldPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>كلمة المرور الجديدة</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  placeholder="8 أحرف على الأقل"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 6 }}>تأكيد كلمة المرور الجديدة</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  placeholder="أعد إدخال كلمة المرور الجديدة"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              {passwordError && (
+                <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--danger)' }}>
+                  <i className="fa fa-exclamation-circle" style={{ marginLeft: 6 }} />{passwordError}
+                </div>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                {changingPassword ? <><i className="fa fa-spinner fa-spin" /> جارٍ التغيير...</> : <><i className="fa fa-key" /> تغيير كلمة المرور</>}
+              </button>
+            </div>
+          </Card>
         </div>
       )}
     </>

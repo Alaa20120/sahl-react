@@ -79,6 +79,54 @@ function exportDelegateStatement(d: any) {
   })
 }
 
+function exportDelegateWarehouse(d: any) {
+  const soldQty: Record<string, number> = {}
+  d.invoices
+    .filter((inv: any) => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
+    .forEach((inv: any) => inv.items.forEach((it: any) => {
+      if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
+    }))
+
+  const grouped: Record<string, { name: string; sku: string; cost: number; received: number }> = {}
+  d.warehouse.forEach((w: any) => {
+    const key = w.productId || w.productName
+    if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, received: 0 }
+    grouped[key].received += w.qty
+  })
+
+  const rows = Object.entries(grouped).map(([key, r]) => {
+    const companyQty = d.warehouse.filter((w: any) => (w.productId || w.productName) === key && w.source === 'company').reduce((s: number, w: any) => s + w.qty, 0)
+    const purchaseQty = d.warehouse.filter((w: any) => (w.productId || w.productName) === key && w.source === 'purchased').reduce((s: number, w: any) => s + w.qty, 0)
+    const sold = soldQty[key] || 0
+    const available = Math.max(0, r.received - sold)
+    return { key, name: r.name, sku: r.sku, companyQty, purchaseQty, sold, available, cost: r.cost, value: available * r.cost }
+  })
+
+  exportExcel({
+    title: `مستودع المندوب — ${d.name}`,
+    filename: `مستودع-${d.name}-${new Date().toISOString().slice(0,10)}`,
+    columns: [
+      { header: 'الصنف', key: 'name', width: 28, type: 'text' },
+      { header: 'وارد من الشركة', key: 'companyQty', width: 16, type: 'number', align: 'center' },
+      { header: 'مشتريات', key: 'purchaseQty', width: 14, type: 'number', align: 'center' },
+      { header: 'المباع', key: 'sold', width: 12, type: 'number', align: 'center' },
+      { header: 'المتاح', key: 'available', width: 12, type: 'number', align: 'center' },
+      { header: 'سعر التكلفة', key: 'cost', width: 16, type: 'currency' },
+      { header: 'قيمة المتاح', key: 'value', width: 16, type: 'currency' },
+    ],
+    rows,
+    totals: {
+      name: `${rows.length} صنف`,
+      companyQty: rows.reduce((s, r) => s + r.companyQty, 0),
+      purchaseQty: rows.reduce((s, r) => s + r.purchaseQty, 0),
+      sold: rows.reduce((s, r) => s + r.sold, 0),
+      available: rows.reduce((s, r) => s + r.available, 0),
+      cost: 0,
+      value: rows.reduce((s, r) => s + r.value, 0),
+    },
+  })
+}
+
 type Tab = 'overview' | 'warehouse' | 'invoices' | 'finance' | 'location'
 
 const INV_STATUS: Record<string, { label: string; css: string }> = {
@@ -101,13 +149,18 @@ export default function DelegateDetailPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const delegates = useDelegateStore(s => s.delegates)
+  const getAvailableStock = useDelegateStore(s => s.getAvailableStock)
+  const returnToMainWarehouse = useDelegateStore(s => s.returnToMainWarehouse)
   const withdrawFromDelegate = useDelegateStore(s => s.withdrawFromDelegate)
-  const transferToMainWarehouse = useDelegateStore(s => s.transferToMainWarehouse)
   const resetDelegateData = useDelegateStore(s => s.resetDelegateData)
-  const setWarehouseQty = useDelegateStore(s => s.setWarehouseQty)
   const addTreasuryTransaction = useTreasuryStore(s => s.addTransaction)
   const accounts = useTreasuryStore(s => s.accounts)
   const customers = useCustomerStore(s => s.customers)
+
+  // Return to main warehouse state
+  const [returnQty, setReturnQty] = useState('')
+  const [returnProductId, setReturnProductId] = useState('')
+  const [showReturnDlg, setShowReturnDlg] = useState(false)
 
   const d = delegates.find(x => x.id === id)
   const [tab, setTab] = useState<Tab>('overview')
@@ -216,12 +269,6 @@ export default function DelegateDetailPage() {
     setShowCollectModal(false)
   }
 
-  function handleTransfer(whItemId: string, qty: number, name: string, costPrice: number) {
-    transferToMainWarehouse(d!.id, whItemId, qty)
-    printStockReceipt(useAppStore.getState().company, d!.name, name, qty, 'وحدة', qty * costPrice)
-    toast(`تم تحويل ${qty} من "${name}" للمخزن الرئيسي`, 'success')
-  }
-
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: 'overview', label: 'نظرة عامة', icon: 'fa-chart-pie' },
     { key: 'warehouse', label: 'المستودع', icon: 'fa-warehouse' },
@@ -270,23 +317,7 @@ export default function DelegateDetailPage() {
         <button className="btn btn-outline btn-sm" onClick={() => { exportDelegateStatement(d); toast('تم تصدير كشف الحساب', 'success') }}>
           <i className="fa fa-file-excel" /> كشف الحساب Excel
         </button>
-        <button className="btn btn-outline btn-sm" onClick={() => {
-          exportExcel({
-            title: `مستودع المندوب — ${d.name}`,
-            filename: `مستودع-${d.name}-${new Date().toISOString().slice(0,10)}`,
-            columns: [
-              { header: 'الصنف', key: 'productName', width: 28, type: 'text' },
-              { header: 'الكمية', key: 'qty', width: 12, type: 'number', align: 'center' },
-              { header: 'سعر التكلفة', key: 'costPrice', width: 16, type: 'currency' },
-              { header: 'الإجمالي', key: 'total', width: 16, type: 'currency' },
-              { header: 'المصدر', key: 'source', width: 14, type: 'text', align: 'center' },
-              { header: 'تاريخ الاستلام', key: 'date', width: 16, type: 'date', align: 'center' },
-            ],
-            rows: d.warehouse.map((w: any) => ({ productName: w.productName, qty: w.qty, costPrice: w.costPrice, total: w.qty*w.costPrice, source: w.source === 'company' ? 'عهدة شركة' : 'مشتريات', date: w.receivedDate })),
-            totals: { productName: `${d.warehouse.length} صنف`, qty: d.warehouse.reduce((s: number,w: any) => s+w.qty,0), costPrice: 0, total: d.warehouse.reduce((s: number,w: any) => s+w.qty*w.costPrice,0), source: '', date: '' },
-          })
-          toast('تم تصدير المستودع', 'success')
-        }}>
+        <button className="btn btn-outline btn-sm" onClick={() => { exportDelegateWarehouse(d); toast('تم تصدير المستودع', 'success') }}>
           <i className="fa fa-warehouse" /> المستودع Excel
         </button>
       </div>
@@ -393,57 +424,14 @@ export default function DelegateDetailPage() {
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span><i className="fa fa-warehouse" style={{ marginLeft: 8, color: 'var(--blue)' }} /> مستودع المندوب</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>إجمالي القيمة: <strong style={{ color: 'var(--text)' }}>{fmt(whTotal)}</strong></span>
-              <button className="btn btn-outline btn-sm" onClick={() => {
-                // Export aggregated view (received/sold/available)
-                const soldQty: Record<string, number> = {}
-                d.invoices.filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
-                  .forEach(inv => inv.items.forEach((it: any) => {
-                    if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
-                  }))
-                const grouped: Record<string, any> = {}
-                d.warehouse.forEach(w => {
-                  const key = w.productId || w.productName
-                  if (!grouped[key]) grouped[key] = { name: w.productName, cost: w.costPrice, received: 0 }
-                  grouped[key].received += w.qty
-                })
-                const exportRows = Object.entries(grouped).map(([key, r]: any) => ({
-                  productName: r.name,
-                  received: r.received,
-                  sold: soldQty[key] || 0,
-                  available: Math.max(0, r.received - (soldQty[key] || 0)),
-                  costPrice: r.cost,
-                  totalValue: Math.max(0, r.received - (soldQty[key] || 0)) * r.cost,
-                }))
-                exportExcel({
-                  title: `مستودع المندوب — ${d.name}`,
-                  filename: `مستودع-${d.name}-${new Date().toISOString().slice(0,10)}`,
-                  columns: [
-                    { header: 'الصنف', key: 'productName', width: 28, type: 'text' },
-                    { header: 'المستلم', key: 'received', width: 12, type: 'number', align: 'center' },
-                    { header: 'المباع', key: 'sold', width: 12, type: 'number', align: 'center' },
-                    { header: 'المتوفر', key: 'available', width: 12, type: 'number', align: 'center' },
-                    { header: 'سعر التكلفة', key: 'costPrice', width: 16, type: 'currency' },
-                    { header: 'قيمة المتوفر', key: 'totalValue', width: 18, type: 'currency' },
-                  ],
-                  rows: exportRows,
-                  totals: {
-                    productName: `${exportRows.length} صنف`,
-                    received: exportRows.reduce((s,r) => s+r.received, 0),
-                    sold: exportRows.reduce((s,r) => s+r.sold, 0),
-                    available: exportRows.reduce((s,r) => s+r.available, 0),
-                    costPrice: 0,
-                    totalValue: exportRows.reduce((s,r) => s+r.totalValue, 0),
-                  },
-                })
-                toast('تم تصدير المستودع', 'success')
-              }}>
-                <i className="fa fa-file-excel" /> Excel
+              <button className="btn btn-outline btn-sm" onClick={() => { setShowReturnDlg(true); setReturnProductId(''); setReturnQty('') }}>
+                <i className="fa fa-undo" /> سحب كمية للمخزن الرئيسي
               </button>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>إجمالي القيمة: <strong style={{ color: 'var(--text)' }}>{fmt(whTotal)}</strong></span>
             </div>
           </div>
           {(() => {
-            // Aggregate by product: warehouse.qty is already net (after confirm + transfers)
+            // Aggregate by product: calculate received / sold / available
             const soldQty: Record<string, number> = {}
             d.invoices
               .filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
@@ -451,18 +439,17 @@ export default function DelegateDetailPage() {
                 if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
               }))
 
-            const grouped: Record<string, { name: string; sku: string; cost: number; available: number; ids: string[] }> = {}
+            const grouped: Record<string, { name: string; sku: string; cost: number; received: number }> = {}
             d.warehouse.forEach(w => {
               const key = w.productId || w.productName
-              if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, available: 0, ids: [] }
-              grouped[key].available += w.qty
-              grouped[key].ids.push(w.id)
+              if (!grouped[key]) grouped[key] = { name: w.productName, sku: w.productSku || '', cost: w.costPrice, received: 0 }
+              grouped[key].received += w.qty
             })
 
             const rows = Object.entries(grouped).map(([key, r]) => ({
               key, ...r,
               sold: soldQty[key] || 0,
-              received: r.available + (soldQty[key] || 0),
+              available: Math.max(0, r.received - (soldQty[key] || 0)),
             }))
 
             if (rows.length === 0) return (
@@ -478,48 +465,40 @@ export default function DelegateDetailPage() {
                   <thead>
                     <tr>
                       <th>الصنف</th>
-                      <th style={{ textAlign: 'center' }}>المستلم</th>
+                      <th style={{ textAlign: 'center' }}>وارد من الشركة</th>
+                      <th style={{ textAlign: 'center' }}>مشتريات</th>
                       <th style={{ textAlign: 'center', color: 'var(--danger)' }}>المباع</th>
-                      <th style={{ textAlign: 'center', color: 'var(--success)' }}>المتوفر</th>
+                      <th style={{ textAlign: 'center', color: 'var(--success)' }}>المتاح</th>
                       <th>سعر التكلفة</th>
-                      <th>قيمة المتوفر</th>
-                      <th>إجراء (أدمن فقط)</th>
+                      <th>قيمة المتاح</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map(r => (
-                      <tr key={r.key}>
-                        <td style={{ fontWeight: 600 }}>{r.name}</td>
-                        <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{fmtNum(r.received)}</td>
-                        <td style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{r.sold > 0 ? fmtNum(r.sold) : '—'}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
-                        <td>{fmt(r.cost)}</td>
-                        <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
-                        <td style={{ textAlign: 'center' }}>
-                          <button className="btn btn-sm btn-outline" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => {
-                            const whItem = d.warehouse.find(w => (w.productId || w.productName) === r.key)
-                            if (!whItem) return
-                            const val = prompt(`تعديل كمية "${r.name}" في المستودع:\nالمستلم حالياً: ${r.received}\nالمباع: ${r.sold}\nأدخل الكمية المستلمة الجديدة:`, String(r.received))
-                            if (val !== null) {
-                              const newQty = parseInt(val) || 0
-                              setWarehouseQty(d.id, whItem.id, newQty)
-                            }
-                          }}>
-                            ✏️ تعديل
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {rows.map(r => {
+                      const companyQty = d.warehouse.filter(w => (w.productId || w.productName) === r.key && w.source === 'company').reduce((s, w) => s + w.qty, 0)
+                      const purchaseQty = d.warehouse.filter(w => (w.productId || w.productName) === r.key && w.source === 'purchased').reduce((s, w) => s + w.qty, 0)
+                      return (
+                        <tr key={r.key}>
+                          <td style={{ fontWeight: 600 }}>{r.name}</td>
+                          <td style={{ textAlign: 'center', color: 'var(--blue)' }}>{fmtNum(companyQty)}</td>
+                          <td style={{ textAlign: 'center', color: 'var(--muted)' }}>{fmtNum(purchaseQty)}</td>
+                          <td style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>{r.sold > 0 ? fmtNum(r.sold) : '—'}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
+                          <td>{fmt(r.cost)}</td>
+                          <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                   <tfoot>
                     <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
                       <td>الإجمالي</td>
-                      <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + r.received, 0))}</td>
+                      <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + (d.warehouse.filter(w => (w.productId || w.productName) === r.key && w.source === 'company').reduce((sum, w) => sum + w.qty, 0)), 0))}</td>
+                      <td style={{ textAlign: 'center' }}>{fmtNum(rows.reduce((s, r) => s + (d.warehouse.filter(w => (w.productId || w.productName) === r.key && w.source === 'purchased').reduce((sum, w) => sum + w.qty, 0)), 0))}</td>
                       <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{fmtNum(rows.reduce((s, r) => s + r.sold, 0))}</td>
                       <td style={{ textAlign: 'center', color: 'var(--success)' }}>{fmtNum(rows.reduce((s, r) => s + r.available, 0))}</td>
                       <td></td>
                       <td>{fmt(rows.reduce((s, r) => s + r.available * r.cost, 0))}</td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -761,6 +740,95 @@ export default function DelegateDetailPage() {
           </div>
         </div>
       )}
+      {/* Return to Main Warehouse Modal */}
+      <Modal open={showReturnDlg} onClose={() => { setShowReturnDlg(false); setReturnProductId(''); setReturnQty('') }} title="سحب كمية للمخزن الرئيسي"
+        footer={<>
+          <button className="btn btn-outline" onClick={() => { setShowReturnDlg(false); setReturnProductId(''); setReturnQty('') }}>إلغاء</button>
+        </>}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: 'var(--warn-bg)', borderRadius: 8, padding: '12px 16px', fontSize: 12, color: 'var(--warn)' }}>
+            <i className="fa fa-exclamation-triangle" style={{ marginLeft: 6 }} />
+            سيتم سحب الكمية من المندوب وإعادتها للمخزن الرئيسي. يمكنك سحب الكمية المتاحة فقط.
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>الصنف</th>
+                  <th style={{ textAlign: 'center' }}>الوارد</th>
+                  <th style={{ textAlign: 'center' }}>المباع</th>
+                  <th style={{ textAlign: 'center' }}>المتاح</th>
+                  <th style={{ textAlign: 'center', width: 100 }}>الكمية</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const soldQty: Record<string, number> = {}
+                  d.invoices.filter(inv => inv.type === 'sale' && (inv.status === 'confirmed' || inv.status === 'paid'))
+                    .forEach(inv => inv.items.forEach((it: any) => {
+                      if (it.productId) soldQty[it.productId] = (soldQty[it.productId] || 0) + (it.qty || 0)
+                    }))
+                  const grouped: Record<string, { name: string; received: number; cost: number }> = {}
+                  d.warehouse.forEach(w => {
+                    const key = w.productId || w.productName
+                    if (!grouped[key]) grouped[key] = { name: w.productName, received: 0, cost: w.costPrice }
+                    grouped[key].received += w.qty
+                  })
+                  return Object.entries(grouped).map(([key, r]) => {
+                    const available = Math.max(0, r.received - (soldQty[key] || 0))
+                    return (
+                      <tr key={key}>
+                        <td style={{ fontWeight: 600 }}>{r.name}</td>
+                        <td style={{ textAlign: 'center' }}>{fmtNum(r.received)}</td>
+                        <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{fmtNum(soldQty[key] || 0)}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(available)}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max={available}
+                            className="form-control"
+                            style={{ width: 80, textAlign: 'center', padding: '4px 6px', fontSize: 12 }}
+                            placeholder="Qty"
+                            data-return={key}
+                            onChange={e => { setReturnProductId(key); setReturnQty(e.target.value) }}
+                          />
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={async () => {
+                              const input = document.querySelector(`input[data-return="${key}"]`) as HTMLInputElement
+                              const qty = parseInt(input?.value || returnQty)
+                              if (isNaN(qty) || qty <= 0) { toast('أدخل كمية صحيحة', 'warn'); return }
+                              if (qty > available) { toast(`الكمية المتاحة فقط: ${available}`, 'warn'); return }
+                              try {
+                                await returnToMainWarehouse(d.id, key, qty)
+                                toast(`تم سحب ${qty} من "${r.name}" للمخزن الرئيسي`, 'success')
+                                setReturnProductId('')
+                                setReturnQty('')
+                              } catch (err: any) {
+                                toast(err.message || 'فشل السحب', 'danger')
+                              }
+                            }}
+                          >
+                            <i className="fa fa-check" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
+                {d.warehouse.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>المستودع فارغ</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
+
       {/* Collect from Customer Modal */}
       <Modal open={showCollectModal} onClose={() => setShowCollectModal(false)} title="تحصيل آجل من عميل"
         footer={<>

@@ -22,7 +22,7 @@ import { FIXED_ASSETS, ASSET_CATEGORIES, type AssetStatus, type AssetOwnership, 
 // ── Users imports ──
 import { USERS, ROLE_LABELS, USER_STATS, type UserRole, type UserStatus } from '@/lib/mock-data/users'
 
-const TABS = ['الموظفون', 'المندوبون', 'مسير الرواتب', 'السلف والمصروفات', 'الأصول الثابتة', 'المستخدمون']
+const TABS = ['الموظفون', 'المندوبون', 'مسير الرواتب', 'سجل الرواتب', 'السلف والمصروفات', 'الأصول الثابتة', 'المستخدمون']
 
 // ── Fixed Assets helpers ──
 const ASSET_STATUS_COLORS: Record<AssetStatus, string> = { active: 'var(--success)', maintenance: 'var(--warn)', disposed: 'var(--danger)' }
@@ -115,16 +115,18 @@ export default function HRPage() {
       })
     })
 
-    // 2. Delegates (Base salary 4000 + 5% commission on sales)
+    // 2. Delegates (Dynamic base salary + commission rate)
     delegates.forEach(del => {
       if (del.status !== 'active') return
-      const commission = del.stats.totalSales * 0.05
+      const baseSalary = del.baseSalary || 4000
+      const commissionRate = (del.commissionRate || 5) / 100
+      const commission = del.stats.totalSales * commissionRate
       const delAdvances = expenses.filter((ex: Expense) => ex.type === 'advance' && ex.employee === del.name && ex.status === 'approved').reduce((s, ex) => s + ex.amount, 0)
       items.push({
         id: del.id, name: del.name, type: 'مندوب',
-        basic: 4000, allowances: commission, deductions: 0,
+        basic: baseSalary, allowances: commission, deductions: 0,
         advance: delAdvances,
-        net: 4000 + commission - 0 - delAdvances
+        net: baseSalary + commission - 0 - delAdvances
       })
     })
 
@@ -132,6 +134,8 @@ export default function HRPage() {
   }, [delegates, expenses])
 
   const totalPayrollNet = payrollItems.reduce((s, item) => s + item.net, 0)
+  const salaryPayments = useHRStore(s => s.salaryPayments)
+  const runPayroll = useHRStore(s => s.runPayroll)
 
   const filtered = employees.filter(e => {
     const matchDept = dept === 'الكل' || e.department === dept
@@ -143,26 +147,33 @@ export default function HRPage() {
   const active = employees.filter(e => e.status === 'active').length
   const onLeave = employees.filter(e => e.status === 'leave').length
 
-  function handleRunPayroll() {
-    if (payrollRun) {
-      toast('تم تشغيل مسير الرواتب لهذا الشهر مسبقاً', 'danger')
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const [payrollMonth, setPayrollMonth] = useState(currentMonth)
+
+  async function handleRunPayroll() {
+    if (payrollItems.length === 0) {
+      toast('لا يوجد موظفون أو مناديب نشطون للصرف', 'warn')
       return
     }
 
-    addTransaction({
-      date: new Date().toISOString().slice(0, 10),
-      description: 'رواتب الموظفين والمناديب — الشهر الحالي',
-      type: 'out',
-      category: 'salary',
-      amount: totalPayrollNet,
-      account: 'bank1' // Defaulting to bank1 for salaries
-    })
+    const alreadyPaid = salaryPayments.some(p => p.month === payrollMonth)
+    if (alreadyPaid) {
+      if (!window.confirm('تم صرف رواتب هذا الشهر مسبقاً. هل تريد الصرف مرة أخرى؟')) return
+    }
 
-    // Mark advances as paid
-    expenseStore.setExpenses(expenses.map((ex: Expense) => ex.type === 'advance' && ex.status === 'approved' ? { ...ex, status: 'paid' as Expense['status'] } : ex))
-    setPayrollRun(true)
-
-    toast('تم تشغيل مسير الرواتب وخصم السلف من الموظفين بنجاح!', 'success')
+    run(async () => {
+      await runPayroll(payrollMonth, payrollItems.map(item => ({
+        employeeId: item.type === 'موظف' ? item.id : undefined,
+        delegateId: item.type === 'مندوب' ? item.id : undefined,
+        name: item.name,
+        basicSalary: item.basic,
+        allowances: item.allowances,
+        deductions: item.deductions,
+        netSalary: item.net,
+      })))
+      setPayrollRun(true)
+      toast(`تم صرف رواتب شهر ${payrollMonth} بنجاح!`, 'success')
+    }).catch((err: any) => toast(`خطأ في الصرف: ${err?.message || 'حاول مرة أخرى'}`, 'danger'))
   }
 
   // ── Fixed Assets handlers ──
@@ -444,7 +455,13 @@ export default function HRPage() {
       {/* ── Payroll Tab ── */}
       {tab === 'مسير الرواتب' && (
         <div className="card">
-          <div className="card-header"><span className="card-title">مسير رواتب الشهر الحالي</span></div>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="card-title">مسير رواتب الشهر</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 12, color: 'var(--muted)' }}>الشهر:</label>
+              <input type="month" className="form-control" style={{ width: 160 }} value={payrollMonth} onChange={e => setPayrollMonth(e.target.value)} />
+            </div>
+          </div>
           <div className="card-body">
             <div className="grid-3 mb-4">
               <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 16, textAlign: 'center' }}>
@@ -482,9 +499,53 @@ export default function HRPage() {
               </table>
             </div>
 
-            <button className="btn btn-primary" onClick={handleRunPayroll} disabled={payrollRun}>
-              <i className={`fa ${payrollRun ? 'fa-check' : 'fa-rocket'}`} /> {payrollRun ? 'تم تشغيل مسير الرواتب' : 'تنفيذ مسير الرواتب'}
+            <button className="btn btn-primary" onClick={handleRunPayroll} disabled={saving}>
+              <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-rocket'}`} /> {saving ? 'جارٍ الصرف...' : 'تنفيذ مسير الرواتب'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Salary History Tab ── */}
+      {tab === 'سجل الرواتب' && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">سجل الرواتب المدفوعة</span></div>
+          <div className="card-body">
+            {salaryPayments.length === 0 ? (
+              <div className="empty-state">
+                <i className="fa fa-money-bill-wave empty-state-icon" />
+                <div className="empty-state-title">لا توجد رواتب مدفوعة</div>
+                <div className="empty-state-sub">سيتم عرض الرواتب بعد تنفيذ مسير الرواتب</div>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>الشهر</th><th>الاسم</th><th>الراتب الأساسي</th><th>البدلات</th><th>الخصومات</th><th>الصافي</th><th>تاريخ الصرف</th></tr>
+                  </thead>
+                  <tbody>
+                    {salaryPayments.map(payment => (
+                      <tr key={payment.id}>
+                        <td style={{ fontWeight: 700 }}>{payment.month}</td>
+                        <td style={{ fontWeight: 600 }}>{payment.name}</td>
+                        <td>{fmt(payment.basicSalary)}</td>
+                        <td style={{ color: 'var(--success)' }}>+{fmt(payment.allowances)}</td>
+                        <td style={{ color: 'var(--danger)' }}>-{fmt(payment.deductions)}</td>
+                        <td style={{ fontWeight: 800, color: 'var(--primary)' }}>{fmt(payment.netSalary)}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDate(payment.paidAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>
+                      <td colSpan={5}>الإجمالي</td>
+                      <td style={{ color: 'var(--primary)' }}>{fmt(salaryPayments.reduce((s, p) => s + p.netSalary, 0))}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

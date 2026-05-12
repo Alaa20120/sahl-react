@@ -299,3 +299,29 @@ UPDATE chart_of_accounts SET parent_id = '2' WHERE id IN ('2100','2200','2300');
 UPDATE chart_of_accounts SET parent_id = '3' WHERE id IN ('3100','3200');
 UPDATE chart_of_accounts SET parent_id = '4' WHERE id IN ('4100','4200','4300');
 UPDATE chart_of_accounts SET parent_id = '5' WHERE id IN ('5100','5200','5300','5400');
+
+-- 15. Add password_version to profiles
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_version INTEGER DEFAULT 1;
+
+-- 16. Add salary fields to delegates
+ALTER TABLE delegates ADD COLUMN IF NOT EXISTS base_salary DECIMAL(12,2) DEFAULT 4000;
+ALTER TABLE delegates ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5,2) DEFAULT 5.0;
+
+-- 17. salary_payments table
+CREATE TABLE IF NOT EXISTS salary_payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  delegate_id UUID REFERENCES delegates(id) ON DELETE SET NULL,
+  month TEXT NOT NULL,
+  basic_salary DECIMAL(12,2) DEFAULT 0,
+  allowances DECIMAL(12,2) DEFAULT 0,
+  deductions DECIMAL(12,2) DEFAULT 0,
+  net_salary DECIMAL(12,2) DEFAULT 0,
+  paid_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 18. RLS for salary_payments
+ALTER TABLE salary_payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "salary_payments_select" ON salary_payments FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "salary_payments_write" ON salary_payments FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));

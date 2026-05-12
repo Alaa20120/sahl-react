@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { useInventoryStore } from '@/store/inventory.store'
-import { PRODUCTS } from '@/lib/mock-data/inventory'
+
 
 const INV_STATUS: Record<string, { label: string; css: string }> = {
   paid:      { label: 'مدفوعة',  css: 'status-active' },
@@ -32,7 +32,8 @@ export default function DelegatePage() {
   const confirmDelegateInvoice = useDelegateStore(s => s.confirmDelegateInvoice)
   const deductFromWarehouse = useDelegateStore(s => s.deductFromWarehouse)
   const addToWarehouse = useDelegateStore(s => s.addToWarehouse)
-  const setWarehouseQty = useDelegateStore(s => s.setWarehouseQty)
+
+  const products = useInventoryStore(s => s.products)
 
   const d = delegate || {
     id: delegateId,
@@ -93,7 +94,7 @@ export default function DelegatePage() {
         delegateWarehouse.forEach((w: any) => {
           if (!w.productId || w.qty <= 0) return
           if (!grouped[w.productId]) {
-            const catalogProduct = PRODUCTS.find((pr: any) => pr.id === w.productId)
+            const catalogProduct = products.find((pr: any) => pr.id === w.productId)
             grouped[w.productId] = {
               id: w.productId,
               name: catalogProduct?.name || w.productName,
@@ -116,7 +117,7 @@ export default function DelegatePage() {
         })
         return Object.values(grouped).filter((p: any) => p.whQty > 0)
       })()
-    : PRODUCTS.map((p: any) => ({ ...p, whQty: undefined }))
+    : products.map((p: any) => ({ ...p, whQty: undefined }))
   const filteredProducts = productSearch.trim()
     ? (availableProducts as any[]).filter((p: any) =>
         p.name.includes(productSearch) || (p.sku || '').toLowerCase().includes(productSearch.toLowerCase())
@@ -188,7 +189,7 @@ export default function DelegatePage() {
         const ok = deductFromWarehouse(delegateId, item.productId, parseFloat(item.qty) || 0)
         if (!ok) { toast(`الكمية غير متوفرة في المستودع لـ "${item.desc}"`, 'danger'); return }
       }
-      const catalogItems = newItems.filter(it => PRODUCTS.some((p: any) => p.id === it.productId))
+      const catalogItems = newItems.filter(it => products.some((p: any) => p.id === it.productId))
       if (catalogItems.length > 0) deductFromInventory(catalogItems.map(it => ({ productId: it.productId, qty: parseFloat(it.qty) || 0 })))
     }
 
@@ -215,7 +216,7 @@ export default function DelegatePage() {
     // Add purchased items to delegate warehouse
     if (newInvType === 'purchase') {
       for (const item of newItems) {
-        const catalogProduct = PRODUCTS.find((p: any) => p.id === item.productId)
+        const catalogProduct = products.find((p: any) => p.id === item.productId)
         addToWarehouse(delegateId, {
           productId: item.productId || `PROD-${Date.now()}`,
           productName: item.desc,
@@ -245,7 +246,7 @@ export default function DelegatePage() {
     // Sync main inventory
     const inv = d.invoices.find((i: any) => i.id === invId)
     if (inv) {
-      const catalogItems = (inv.items || []).filter((it: any) => it.productId && PRODUCTS.some((p: any) => p.id === it.productId))
+      const catalogItems = (inv.items || []).filter((it: any) => it.productId && products.some((p: any) => p.id === it.productId))
       if (catalogItems.length > 0) deductFromInventory(catalogItems.map((it: any) => ({ productId: it.productId, qty: it.qty })))
     }
     toast('تم تأكيد التسليم وخصم المخزون', 'success')
@@ -470,22 +471,10 @@ export default function DelegatePage() {
                       <td style={{ textAlign: 'center', fontWeight: 800, color: r.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{fmtNum(r.available)}</td>
                       <td>{fmt(r.cost)}</td>
                       <td style={{ fontWeight: 700 }}>{fmt(r.available * r.cost)}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button className="btn btn-sm btn-outline" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => {
-                          const whItem = delegateWarehouse.find((w: any) => (w.productId || w.productName) === r.key)
-                          if (!whItem) return
-                          const val = prompt(`تعديل كمية "${r.name}" في المستودع:\nالمستلم حالياً: ${r.received}\nالمباع: ${r.sold}\nأدخل الكمية المستلمة الجديدة:`, String(r.received))
-                          if (val !== null) {
-                            const newQty = parseInt(val) || 0
-                            setWarehouseQty(delegateId, whItem.id, newQty)
-                          }
-                        }}>
-                          ✏️ تعديل
-                        </button>
-                      </td>
+
                     </tr>
                   ))}
-                  {rows.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>المستودع فارغ</td></tr>}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--bg)', fontWeight: 800 }}>

@@ -7,7 +7,6 @@ import { useAuthStore } from '@/store/auth.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { useInventoryStore } from '@/store/inventory.store'
-import { PRODUCTS } from '@/lib/mock-data/inventory'
 
 interface CartItem {
   productId: string

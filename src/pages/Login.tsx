@@ -71,6 +71,7 @@ export default function Login() {
           role: (meta.role || 'admin') as any,
           company: import.meta.env.VITE_COMPANY_NAME || 'سهل',
           accessToken: authData.access_token,
+          passwordVersion: meta.password_version || 1,
         })
         setLoginAttempts(0)
         // Force hard navigation to avoid React Router issues

@@ -96,7 +96,9 @@ export const usePurchaseStore = create<PurchaseStore>()(
 
         counters[year] = n
         const number = `${prefix}${String(n).padStart(3,'0')}`
-        const purchase: Purchase = { ...data, id: number, number }
+        // Default status to pending unless explicitly received
+        const initialStatus: PurchaseStatus = data.status === 'received' ? 'received' : 'pending'
+        const purchase: Purchase = { ...data, id: number, number, status: initialStatus }
 
         if (isSupabaseConfigured()) {
           const result = await supaFetch('purchases', {
@@ -112,7 +114,7 @@ export const usePurchaseStore = create<PurchaseStore>()(
               tax: data.tax,
               total: data.total,
               paid: data.paid || 0,
-              status: data.status,
+              status: initialStatus,
               created_by: data.createdBy || null,
             },
           })
@@ -133,8 +135,8 @@ export const usePurchaseStore = create<PurchaseStore>()(
             })
           }
           purchase.id = inserted.id
-          // Only add to stock if purchase is received (cash payment = received immediately)
-          if (data.status === 'received') {
+          // Only add to stock if purchase is explicitly confirmed as received
+          if (initialStatus === 'received') {
             for (const item of data.lineItems) {
               if (item.productId) {
                 await useInventoryStore.getState().addStock(item.productId, item.qty, `purchase_${purchase.id}`)
@@ -194,15 +196,19 @@ export const usePurchaseStore = create<PurchaseStore>()(
       },
 
       async confirmReceipt(id) {
+        const purchase = get().purchases.find(p => p.id === id || p.number === id)
+        if (!purchase) return
+        // Prevent double confirmation
+        if (purchase.status === 'received') {
+          throw new Error('هذه الفاتورة مؤكدة بالفعل')
+        }
+
         if (isSupabaseConfigured()) {
           await supaFetch('purchases', { method: 'PATCH', filter: 'id=eq.' + id, body: { status: 'received' } })
-          // Add to stock when confirmed as received
-          const purchase = get().purchases.find(p => p.id === id || p.number === id)
-          if (purchase && purchase.status !== 'received') {
-            for (const item of purchase.lineItems) {
-              if (item.productId) {
-                await useInventoryStore.getState().addStock(item.productId, item.qty, `confirm_${id}`)
-              }
+          // Add to stock when confirmed as received — ONCE ONLY
+          for (const item of purchase.lineItems) {
+            if (item.productId) {
+              await useInventoryStore.getState().addStock(item.productId, item.qty, `confirm_${id}`)
             }
           }
         }

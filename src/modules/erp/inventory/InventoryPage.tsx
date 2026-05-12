@@ -4,7 +4,6 @@ import PageHeader from '@/components/ui/PageHeader'
 import StatCard from '@/components/ui/StatCard'
 import Modal from '@/components/ui/Modal'
 import { fmt, fmtNum } from '@/lib/format'
-import { hasPendingWithdrawals } from '@/lib/mock-data/inventory'
 import { useInventoryStore } from '@/store/inventory.store'
 import { useDelegateStore } from '@/store/delegate.store'
 import { useInvoiceStore } from '@/store/invoice.store'
@@ -18,7 +17,7 @@ const BLANK_PRODUCT = { name: '', category: '', unit: 'قطعة', costPrice: '',
 export default function InventoryPage() {
   const navigate = useNavigate()
   const { products, deleteProducts, addProduct } = useInventoryStore()
-  const { delegates, getAggregatedWarehouse } = useDelegateStore()
+  const { delegates } = useDelegateStore()
   const { invoices } = useInvoiceStore()
   const { categories, addCategory } = useCategoryStore()
   const { saving, run } = useSaving()
@@ -72,11 +71,12 @@ export default function InventoryPage() {
   const adjustSaving = useSaving()
 
   // Withdraw from delegate warehouse
-  const [showWithdrawDlg, setShowWithdrawDlg] = useState(false)
-  const [withdrawDelegateId, setWithdrawDelegateId] = useState('')
-  const [withdrawProductId, setWithdrawProductId] = useState('')
-  const [withdrawQtyInput, setWithdrawQtyInput] = useState('')
-  const transferToMainWarehouse = useDelegateStore(s => s.transferToMainWarehouse)
+  // Transfer to delegate state
+  const [showTransferDlg, setShowTransferDlg] = useState(false)
+  const [transferDelegateId, setTransferDelegateId] = useState('')
+  const [transferProductId, setTransferProductId] = useState('')
+  const [transferQtyInput, setTransferQtyInput] = useState('')
+  const transferFromMainWarehouse = useDelegateStore(s => s.transferFromMainWarehouse)
 
   const filtered = products.filter(p => {
     const matchCat = category === 'الكل' || p.category === category
@@ -87,7 +87,7 @@ export default function InventoryPage() {
   const lowStock = products.filter(p => p.stock <= p.minStock)
   const totalValue = products.reduce((s, p) => s + p.stock * p.costPrice, 0)
 
-  const selectableFiltered = filtered.filter(p => !hasPendingWithdrawals(p.id))
+  const selectableFiltered = filtered
   const allFilteredSelected = selectableFiltered.length > 0 && selectableFiltered.every(p => selectedIds.has(p.id))
   const someFilteredSelected = selectableFiltered.some(p => selectedIds.has(p.id))
 
@@ -108,7 +108,6 @@ export default function InventoryPage() {
   }
 
   function toggleSelect(id: string) {
-    if (hasPendingWithdrawals(id)) return
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -168,8 +167,8 @@ export default function InventoryPage() {
             <button className="btn btn-outline btn-sm" onClick={() => { setShowNewCat(true); setNewCatName(''); setCatError('') }}>
               <i className="fa fa-tag" /> فئة جديدة
             </button>
-            <button className="btn btn-outline btn-sm" onClick={() => { setShowWithdrawDlg(true); setWithdrawDelegateId(''); setWithdrawProductId(''); setWithdrawQtyInput('') }}>
-              <i className="fa fa-warehouse" /> سحب من مندوب
+            <button className="btn btn-outline btn-sm" onClick={() => { setShowTransferDlg(true); setTransferDelegateId(''); setTransferProductId(''); setTransferQtyInput('') }}>
+              <i className="fa fa-truck" /> تسليم كمية لمندوب
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
               <i className="fa fa-plus" /> صنف جديد
@@ -346,7 +345,7 @@ export default function InventoryPage() {
             <tbody>
               {filtered.map(p => {
                 const isLow = p.stock <= p.minStock
-                const isProtected = hasPendingWithdrawals(p.id)
+                const isProtected = false
                 const isSelected = selectedIds.has(p.id)
                 return (
                   <tr key={p.id} style={{ background: isSelected ? '#F5F3FF' : undefined }}>
@@ -626,69 +625,70 @@ export default function InventoryPage() {
         )}
       </Modal>
 
-      {/* Withdraw from Delegate Warehouse Modal */}
+      {/* Transfer to Delegate Modal */}
       <Modal
-        open={showWithdrawDlg}
-        onClose={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawProductId(''); setWithdrawQtyInput('') }}
-        title="سحب صنف من مستودع مندوب"
+        open={showTransferDlg}
+        onClose={() => { setShowTransferDlg(false); setTransferDelegateId(''); setTransferProductId(''); setTransferQtyInput('') }}
+        title="تسليم كمية من المخزن الرئيسي لمندوب"
         width={560}
         footer={
-          <button className="btn btn-outline" onClick={() => { setShowWithdrawDlg(false); setWithdrawDelegateId(''); setWithdrawProductId(''); setWithdrawQtyInput('') }}>إغلاق</button>
+          <button className="btn btn-outline" onClick={() => { setShowTransferDlg(false); setTransferDelegateId(''); setTransferProductId(''); setTransferQtyInput('') }}>إغلاق</button>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-group">
             <label className="form-label">المندوب</label>
-            <select className="form-control" value={withdrawDelegateId} onChange={e => { setWithdrawDelegateId(e.target.value); setWithdrawProductId(''); setWithdrawQtyInput('') }}>
+            <select className="form-control" value={transferDelegateId} onChange={e => { setTransferDelegateId(e.target.value); setTransferProductId(''); setTransferQtyInput('') }}>
               <option value="">اختر مندوب...</option>
-              {delegates.filter(d => d.warehouse.length > 0).map(d => (
-                <option key={d.id} value={d.id}>{d.name} ({getAggregatedWarehouse(d.id).length} صنف)</option>
+              {delegates.map(d => (
+                <option key={d.id} value={d.id}>{d.name} ({d.zone || 'بدون منطقة'})</option>
               ))}
             </select>
           </div>
-          {withdrawDelegateId && (
+          {transferDelegateId && (
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>الصنف</th>
-                    <th style={{ textAlign: 'center' }}>وارد</th>
-                    <th style={{ textAlign: 'center' }}>مباع</th>
-                    <th style={{ textAlign: 'center' }}>متاح</th>
-                    <th style={{ textAlign: 'center', width: 100 }}>سحب</th>
+                    <th style={{ textAlign: 'center' }}>المخزون الرئيسي</th>
+                    <th style={{ textAlign: 'center', width: 120 }}>الكمية</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {getAggregatedWarehouse(withdrawDelegateId).map(a => (
-                    <tr key={a.productId}>
-                      <td style={{ fontWeight: 600 }}>{a.productName} <span style={{ fontSize: 11, color: 'var(--muted)' }}>{a.productSku}</span></td>
-                      <td style={{ textAlign: 'center' }}>{a.received}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--danger)' }}>{a.sold || '—'}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: a.available === 0 ? 'var(--danger)' : 'var(--success)' }}>{a.available}</td>
+                  {filtered.map(p => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 600 }}>{p.name} <span style={{ fontSize: 11, color: 'var(--muted)' }}>{p.sku}</span></td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: p.stock === 0 ? 'var(--danger)' : 'var(--success)' }}>{p.stock}</td>
                       <td style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           min="1"
-                          max={a.available}
+                          max={p.stock}
                           className="form-control"
                           style={{ width: 80, textAlign: 'center', padding: '4px 6px', fontSize: 12 }}
-                          placeholder="Qty"
-                          onChange={e => { setWithdrawProductId(a.productId); setWithdrawQtyInput(e.target.value) }}
+                          placeholder="الكمية"
+                          data-transfer={p.id}
+                          onChange={e => { setTransferProductId(p.id); setTransferQtyInput(e.target.value) }}
                         />
                       </td>
                       <td>
                         <button
                           className="btn btn-sm btn-primary"
                           onClick={async () => {
-                            const input = document.querySelector(`input[data-withdraw="${a.productId}"]`) as HTMLInputElement
-                            const qty = parseInt(input?.value || withdrawQtyInput)
+                            const input = document.querySelector(`input[data-transfer="${p.id}"]`) as HTMLInputElement
+                            const qty = parseInt(input?.value || transferQtyInput)
                             if (isNaN(qty) || qty <= 0) { toast('أدخل كمية صحيحة', 'warn'); return }
-                            if (qty > a.available) { toast('الكمية أكبر من المتاح', 'warn'); return }
-                            await transferToMainWarehouse(withdrawDelegateId, a.productId, qty)
-                            toast(`تم سحب ${qty} ${a.productName} للمخزن الرئيسي`, 'success')
-                            setWithdrawProductId('')
-                            setWithdrawQtyInput('')
+                            if (qty > p.stock) { toast('الكمية أكبر من المخزون الرئيسي', 'warn'); return }
+                            try {
+                              await transferFromMainWarehouse(transferDelegateId, p.id, qty)
+                              toast(`تم تسليم ${qty} ${p.unit} من "${p.name}" للمندوب`, 'success')
+                              setTransferProductId('')
+                              setTransferQtyInput('')
+                            } catch (err: any) {
+                              toast(err.message || 'فشل التسليم', 'danger')
+                            }
                           }}
                         >
                           <i className="fa fa-check" />
@@ -696,8 +696,8 @@ export default function InventoryPage() {
                       </td>
                     </tr>
                   ))}
-                  {getAggregatedWarehouse(withdrawDelegateId).length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>لا يوجد أصناف متاحة في المستودع</td></tr>
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>لا يوجد أصناف</td></tr>
                   )}
                 </tbody>
               </table>

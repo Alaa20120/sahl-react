@@ -10,12 +10,20 @@ interface InventoryStore {
   error: string | null
 
   fetch: () => Promise<void>
-  deductStock: (productId: string, qty: number) => Promise<void>
+  deductStock: (productId: string, qty: number, reference?: string) => Promise<void>
   addStock: (productId: string, qty: number, reference?: string) => Promise<void>
-  deductFromInventory: (items: { productId?: string; qty: number }[]) => Promise<void>
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>
   deleteProducts: (ids: string[]) => Promise<void>
   addProduct: (product: Product) => Promise<void>
+
+  // New warehouse transfer operations
+  transferToDelegate: (productId: string, delegateId: string, qty: number) => Promise<void>
+  returnFromDelegate: (productId: string, delegateId: string, qty: number) => Promise<void>
+  getProductStock: (productId: string) => number
+  getAvailableStock: (productId: string) => number
+
+  // Legacy support (used by delegate invoices)
+  deductFromInventory: (items: { productId?: string; qty: number }[]) => Promise<void>
 }
 
 export const useInventoryStore = create<InventoryStore>()(
@@ -49,7 +57,7 @@ export const useInventoryStore = create<InventoryStore>()(
         }
       },
 
-      async deductStock(productId, qty) {
+      async deductStock(productId, qty, reference) {
         const product = get().products.find(p => p.id === productId)
         if (!product) return
         const newStock = Math.max(0, product.stock - qty)
@@ -57,7 +65,7 @@ export const useInventoryStore = create<InventoryStore>()(
           await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + productId, body: { stock: newStock } })
           await supaFetch('stock_movements', {
             method: 'POST',
-            body: { product_id: productId, type: 'out', qty, reference: 'manual_deduction' },
+            body: { product_id: productId, type: 'out', qty, reference: reference || 'manual_deduction' },
           })
         }
         set(state => ({
@@ -81,6 +89,52 @@ export const useInventoryStore = create<InventoryStore>()(
         }))
       },
 
+      async transferToDelegate(productId, delegateId, qty) {
+        const product = get().products.find(p => p.id === productId)
+        if (!product) throw new Error('المنتج غير موجود')
+        if (product.stock < qty) throw new Error(`الكمية غير متوفرة. المخزون: ${product.stock}`)
+
+        const newStock = product.stock - qty
+        if (isSupabaseConfigured()) {
+          await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + productId, body: { stock: newStock } })
+          await supaFetch('stock_movements', {
+            method: 'POST',
+            body: { product_id: productId, type: 'out', qty, reference: `transfer_to_delegate_${delegateId}` },
+          })
+        }
+        set(state => ({
+          products: state.products.map(p => p.id === productId ? { ...p, stock: newStock } : p),
+        }))
+      },
+
+      async returnFromDelegate(productId, delegateId, qty) {
+        const product = get().products.find(p => p.id === productId)
+        if (!product) throw new Error('المنتج غير موجود')
+
+        const newStock = product.stock + qty
+        if (isSupabaseConfigured()) {
+          await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + productId, body: { stock: newStock } })
+          await supaFetch('stock_movements', {
+            method: 'POST',
+            body: { product_id: productId, type: 'in', qty, reference: `return_from_delegate_${delegateId}` },
+          })
+        }
+        set(state => ({
+          products: state.products.map(p => p.id === productId ? { ...p, stock: newStock } : p),
+        }))
+      },
+
+      getProductStock(productId) {
+        const product = get().products.find(p => p.id === productId)
+        return product?.stock || 0
+      },
+
+      getAvailableStock(productId) {
+        // Available stock = total stock minus reserved for delegates
+        // This will be calculated in delegate store
+        return get().getProductStock(productId)
+      },
+
       async deductFromInventory(items) {
         const current = get().products
         const updated = [...current]
@@ -94,7 +148,7 @@ export const useInventoryStore = create<InventoryStore>()(
             await supaFetch('products', { method: 'PATCH', filter: 'id=eq.' + item.productId, body: { stock: newStock } })
             await supaFetch('stock_movements', {
               method: 'POST',
-              body: { product_id: item.productId, type: 'out', qty: item.qty, reference: 'invoice' },
+              body: { product_id: item.productId, type: 'out', qty: item.qty, reference: 'delegate_invoice' },
             })
           }
         }

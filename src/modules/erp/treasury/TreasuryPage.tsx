@@ -37,6 +37,8 @@ export default function TreasuryPage() {
     .filter(p => p.status === 'received')
     .reduce((s, p) => s + p.total, 0)
   const soldValue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0)
+  const totalSalaries = transactions.filter(t => t.category === 'salary' && t.type === 'out').reduce((s, t) => s + t.amount, 0)
+  const totalExpenses = transactions.filter(t => t.category === 'expense' && t.type === 'out').reduce((s, t) => s + t.amount, 0)
 
   const [activeAccount, setActiveAccount] = useState('all')
   const [showNew, setShowNew] = useState(false)
@@ -134,8 +136,12 @@ export default function TreasuryPage() {
         <StatCard label="إجمالي الصادر" value={fmt(totalOut)} badge="▼" badgeType="danger" icon="fa-arrow-up" iconColor="var(--danger)" />
         <StatCard label="قيمة المشتريات المستلمة" value={fmt(inventoryValue)} icon="fa-boxes-stacking" iconColor="var(--blue)" badge="مخزون" badgeType="warn" />
       </div>
-      <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(1,1fr)' }}>
+      <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
         <StatCard label="إجمالي المبيعات المحصلة" value={fmt(soldValue)} icon="fa-chart-line" iconColor="var(--success)" badge="مدفوع" badgeType="success" />
+        <StatCard label="إجمالي الرواتب المدفوعة" value={fmt(totalSalaries)} icon="fa-users" iconColor="var(--blue)" badge="رواتب" badgeType="warn" />
+      </div>
+      <div className="stats-grid mb-6" style={{ gridTemplateColumns: 'repeat(1,1fr)' }}>
+        <StatCard label="إجمالي المصروفات من الخزنة" value={fmt(totalExpenses)} icon="fa-receipt" iconColor="var(--danger)" badge="مصروفات" badgeType="danger" />
       </div>
 
       {/* Accounts */}

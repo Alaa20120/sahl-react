@@ -10,7 +10,6 @@ import { useInventoryStore } from '@/store/inventory.store'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { useAppStore } from '@/store/app.store'
 import { printFinancialReceipt } from '@/lib/print'
-import { PRODUCTS } from '@/lib/mock-data/inventory'
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   paid:    { label: 'مدفوعة',  color: 'var(--success)', bg: 'var(--success-bg)' },
@@ -34,6 +33,7 @@ export default function DelegateInvoiceDetailPage() {
   const addTreasuryTransaction = useTreasuryStore(s => s.addTransaction)
 
   const deductFromInventory = useInventoryStore(s => s.deductFromInventory)
+  const products = useInventoryStore(s => s.products)
   const co = useAppStore(s => s.company)
   const isMobile = useIsMobile()
   const delegate = useMemo(() => delegates.find(d => d.id === delegateId), [delegates, delegateId])
@@ -55,7 +55,7 @@ export default function DelegateInvoiceDetailPage() {
       return
     }
     // Sync main inventory for catalog items
-    const catalogItems = (invoice.items ?? []).filter((it: any) => it.productId && PRODUCTS.some((p: any) => p.id === it.productId))
+    const catalogItems = (invoice.items ?? []).filter((it: any) => it.productId && products.some((p: any) => p.id === it.productId))
     if (catalogItems.length > 0) deductFromInventory(catalogItems.map((it: any) => ({ productId: it.productId, qty: it.qty })))
     toast('تم تأكيد التسليم وحُفظ في قاعدة البيانات ✅', 'success')
   }

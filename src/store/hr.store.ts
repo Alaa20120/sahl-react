@@ -2,21 +2,44 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { EMPLOYEES, type Employee } from '@/lib/mock-data/hr'
+import { useTreasuryStore } from './treasury.store'
+
+interface SalaryPayment {
+  id: string
+  employeeId?: string
+  delegateId?: string
+  name: string
+  month: string
+  basicSalary: number
+  allowances: number
+  deductions: number
+  netSalary: number
+  paidAt: string
+}
 
 interface HRStore {
   employees: Employee[]
+  salaryPayments: SalaryPayment[]
   loading: boolean
   error: string | null
 
   fetch: () => Promise<void>
   addEmployee: (data: Omit<Employee, 'id'>) => Promise<void>
   updateEmployee: (id: string, data: Partial<Employee>) => Promise<void>
+  deleteEmployee: (id: string) => Promise<void>
+
+  // Salary operations
+  addSalaryPayment: (payment: Omit<SalaryPayment, 'id' | 'paidAt'>) => Promise<void>
+  getEmployeeSalaryHistory: (employeeId: string) => SalaryPayment[]
+  getMonthSalaryPayments: (month: string) => SalaryPayment[]
+  runPayroll: (month: string, items: { employeeId?: string; delegateId?: string; name: string; basicSalary: number; allowances: number; deductions: number; netSalary: number }[]) => Promise<void>
 }
 
 export const useHRStore = create<HRStore>()(
   persist(
     (set, get) => ({
       employees: EMPLOYEES,
+      salaryPayments: [],
       loading: false,
       error: null,
 
@@ -94,7 +117,76 @@ export const useHRStore = create<HRStore>()(
           employees: state.employees.map(e => e.id === id ? { ...e, ...data } : e),
         }))
       },
+
+      async deleteEmployee(id) {
+        if (isSupabaseConfigured()) {
+          await supaFetch('employees', { method: 'DELETE', filter: 'id=eq.' + id })
+        }
+        set(state => ({
+          employees: state.employees.filter(e => e.id !== id),
+        }))
+      },
+
+      async addSalaryPayment(payment) {
+        const id = `SAL-${Date.now()}-${Math.random().toString(36).slice(-4)}`
+        const paidAt = new Date().toISOString()
+        const newPayment: SalaryPayment = { ...payment, id, paidAt }
+
+        if (isSupabaseConfigured()) {
+          await supaFetch('salary_payments', {
+            method: 'POST',
+            body: {
+              employee_id: payment.employeeId || null,
+              delegate_id: payment.delegateId || null,
+              month: payment.month,
+              basic_salary: payment.basicSalary,
+              allowances: payment.allowances,
+              deductions: payment.deductions,
+              net_salary: payment.netSalary,
+              paid_at: paidAt,
+            },
+          })
+        }
+        set(state => ({ salaryPayments: [newPayment, ...state.salaryPayments] }))
+      },
+
+      getEmployeeSalaryHistory(employeeId) {
+        return get().salaryPayments.filter(p => p.employeeId === employeeId || p.delegateId === employeeId)
+      },
+
+      getMonthSalaryPayments(month) {
+        return get().salaryPayments.filter(p => p.month === month)
+      },
+
+      async runPayroll(month, items) {
+        const totalNet = items.reduce((s, i) => s + i.netSalary, 0)
+
+        // Deduct from treasury
+        await useTreasuryStore.getState().addTransaction({
+          date: new Date().toISOString().slice(0, 10),
+          description: `مسير رواتب شهر ${month} — ${items.length} موظف/مندوب`,
+          type: 'out',
+          category: 'salary',
+          amount: totalNet,
+          account: 'bank',
+          ref: `PAYROLL-${month}`,
+        })
+
+        // Record individual payments
+        for (const item of items) {
+          await get().addSalaryPayment({
+            employeeId: item.employeeId,
+            delegateId: item.delegateId,
+            name: item.name,
+            month,
+            basicSalary: item.basicSalary,
+            allowances: item.allowances,
+            deductions: item.deductions,
+            netSalary: item.netSalary,
+          })
+        }
+      },
     }),
-    { name: 'sahl-hr-v1' }
+    { name: 'sahl-hr-v2' }
   )
 )

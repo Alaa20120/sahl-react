@@ -9,6 +9,7 @@ import { useInventoryStore } from '@/store/inventory.store'
 import { useCustomerStore } from '@/store/customer.store'
 import { useTreasuryStore } from '@/store/treasury.store'
 import { useAppStore } from '@/store/app.store'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { printFinancialReceipt } from '@/lib/print'
 import { toast } from '@/lib/toast'
 
@@ -222,6 +223,7 @@ export default function InvoiceDetailPage() {
   const [showVoid, setShowVoid]       = useState(false)
   const [payAmount, setPayAmount]     = useState('')
   const [payMethod, setPayMethod]     = useState<'cash' | 'bank' | 'card'>('bank')
+  const isMobile = useIsMobile()
   const status = invoice?.status ?? 'pending'
   // isVoided comes from actual invoice status — persists across refresh
   const isVoided = status === 'returned'
@@ -322,7 +324,7 @@ export default function InvoiceDetailPage() {
         <div style={{ flex: 1 }} />
 
         {/* Template switcher */}
-        <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, flexWrap: 'wrap' }}>
           {TEMPLATES.map(t => (
             <button
               key={t.id}
@@ -425,7 +427,7 @@ export default function InvoiceDetailPage() {
           )}
 
           {/* Header */}
-          <div style={{ background: tpl.headerBg, color: tpl.headerColor, padding: '28px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ background: tpl.headerBg, color: tpl.headerColor, padding: isMobile ? '20px 16px' : '28px 40px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', gap: isMobile ? 16 : 0 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                 <div style={{
@@ -455,8 +457,8 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>فاتورة ضريبية</div>
+            <div style={{ textAlign: isMobile ? 'right' : 'left' }}>
+              <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, letterSpacing: -0.5 }}>فاتورة ضريبية</div>
               <div style={{ fontSize: 12, opacity: .65, marginTop: 2 }}>TAX INVOICE</div>
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: 2, opacity: .9 }}>
                 <div><strong style={{ opacity: .6, fontWeight: 600 }}>رقم الفاتورة:</strong> {invoice.number}</div>
@@ -468,7 +470,7 @@ export default function InvoiceDetailPage() {
 
           {/* Body */}
           <div className="inv-body">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 16 : 32, marginBottom: 24 }}>
               <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: tpl.accentColor, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>فاتورة إلى</div>
                 <div style={{ fontWeight: 800, fontSize: 15 }}>{invoice.customer}</div>
@@ -495,7 +497,8 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            <table className="inv-table">
+            <div style={{ overflowX: 'auto' }}>
+            <table className="inv-table" style={{ minWidth: isMobile ? 500 : undefined }}>
               <thead>
                 <tr style={{ '--accent': tpl.accentColor } as React.CSSProperties}>
                   <th style={{ width: 36 }}>#</th>
@@ -517,9 +520,10 @@ export default function InvoiceDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
 
             {/* Footer section: QR + Notes | Totals */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 28, gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: isMobile ? 20 : 28, gap: isMobile ? 16 : 24 }}>
               <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flex: 1 }}>
                 <div style={{ flexShrink: 0 }}>
                   <ZATCAQRCode
@@ -546,7 +550,7 @@ export default function InvoiceDetailPage() {
                 </div>
               </div>
 
-              <div style={{ minWidth: 260 }}>
+              <div style={{ minWidth: isMobile ? undefined : 260, width: isMobile ? '100%' : undefined }}>
                 <div className="inv-totals" style={{ width: '100%' }}>
                   <div className="inv-totals-row">
                     <span style={{ color: 'var(--muted)' }}>المجموع قبل الضريبة</span>
@@ -578,7 +582,7 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 36, paddingTop: 14, borderTop: `2px solid ${tpl.accentColor}20`, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)' }}>
+            <div style={{ marginTop: 36, paddingTop: 14, borderTop: `2px solid ${tpl.accentColor}20`, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', gap: 4 }}>
               <div>{co.name || '—'} — السجل التجاري: {co.cr || '—'}</div>
               <div style={{ textAlign: 'center' }}>صفحة 1 من 1</div>
               <div>تم الإصدار بنظام سهل ERP</div>

@@ -8,17 +8,64 @@ import { useAuthStore } from '@/store/auth.store'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 
 // Delete order respects FK dependencies (child → parent)
-const RESET_TABLES = [
-  'invoice_items', 'invoices',
-  'purchase_items', 'purchases',
-  'customer_payments', 'customers',
-  'stock_movements', 'products',
-  'expenses',
-  'treasury_transactions',
-  'employees',
-  'delegate_invoices', 'delegate_warehouse', 'delegates',
-  'categories',
-]
+const RESET_GROUPS: Record<string, { label: string; icon: string; tables: string[]; localKeys: string[] }> = {
+  inventory: {
+    label: 'المخزون والمنتجات',
+    icon: 'fa-boxes-stacked',
+    tables: ['stock_movements', 'products'],
+    localKeys: ['sahl-inventory-v1'],
+  },
+  invoices: {
+    label: 'الفواتير',
+    icon: 'fa-file-invoice',
+    tables: ['invoice_items', 'invoices', 'zatca_invoices'],
+    localKeys: ['sahl-invoices-v1'],
+  },
+  purchases: {
+    label: 'أوامر الشراء',
+    icon: 'fa-shopping-cart',
+    tables: ['purchase_items', 'purchases'],
+    localKeys: ['sahl-purchases-v3'],
+  },
+  customers: {
+    label: 'العملاء والموردين',
+    icon: 'fa-users',
+    tables: ['customer_payments', 'customers'],
+    localKeys: ['sahl-customers-v1'],
+  },
+  treasury: {
+    label: 'الخزينة والمعاملات',
+    icon: 'fa-money-bill-wave',
+    tables: ['treasury_transactions'],
+    localKeys: ['sahl-treasury-v2'],
+  },
+  expenses: {
+    label: 'المصروفات والسلف',
+    icon: 'fa-receipt',
+    tables: ['expenses'],
+    localKeys: ['sahl-expenses-v1'],
+  },
+  employees: {
+    label: 'الموظفين والرواتب',
+    icon: 'fa-user-tie',
+    tables: ['salary_payments', 'payroll_overrides', 'employees'],
+    localKeys: ['sahl-hr-v2'],
+  },
+  delegates: {
+    label: 'المناديب والمستودعات',
+    icon: 'fa-warehouse',
+    tables: ['delegate_invoice_items', 'delegate_invoices', 'delegate_transactions', 'delegate_warehouse', 'delegates'],
+    localKeys: ['sahl-delegates-v2'],
+  },
+  categories: {
+    label: 'الفئات',
+    icon: 'fa-tags',
+    tables: ['categories'],
+    localKeys: ['sahl-categories-v1'],
+  },
+}
+
+const ALL_RESET_TABLES = Object.values(RESET_GROUPS).flatMap(g => g.tables)
 
 const TABS = ['الشركة', 'الفواتير', 'الضريبة', 'الإشعارات', 'النسخ الاحتياطي', 'الحساب']
 
@@ -72,21 +119,38 @@ export default function SettingsPage() {
     }
   }
 
+  async function deleteTables(tables: string[], localKeys: string[]) {
+    if (isSupabaseConfigured()) {
+      for (const table of tables) {
+        try { await supaFetch(table, { method: 'DELETE', filter: 'id=not.is.null' }) } catch { /* skip */ }
+      }
+    }
+    for (const key of localKeys) {
+      if (localStorage.getItem(key)) localStorage.removeItem(key)
+    }
+  }
+
+  async function handlePartialReset(groupKey: string) {
+    const group = RESET_GROUPS[groupKey]
+    if (!group) return
+    if (!window.confirm(`⚠️ سيتم حذف بيانات "${group.label}" بشكل نهائي. هل أنت متأكد؟`)) return
+    setResetting(true)
+    try {
+      await deleteTables(group.tables, group.localKeys)
+      toast(`تم مسح بيانات ${group.label} بنجاح ✅`, 'success')
+      setTimeout(() => window.location.reload(), 1200)
+    } catch (e: any) {
+      toast(`خطأ أثناء المسح: ${e.message}`, 'danger')
+      setResetting(false)
+    }
+  }
+
   async function handleFullReset() {
     if (!window.confirm('⚠️ سيتم حذف جميع البيانات (فواتير، عملاء، مخزون، مشتريات...) بشكل نهائي لا يمكن التراجع عنه. هل أنت متأكد؟')) return
     if (!window.confirm('تأكيد نهائي — هذه العملية لا يمكن التراجع عنها. اضغط موافق للمتابعة.')) return
     setResetting(true)
     try {
-      if (isSupabaseConfigured()) {
-        for (const table of RESET_TABLES) {
-          try { await supaFetch(table, { method: 'DELETE', filter: 'id=not.is.null' }) } catch { /* skip */ }
-        }
-      }
-      // Clear all data stores from localStorage (keep auth + company settings)
-      const KEEP = new Set(['sahl-auth', 'sahl-app-v2'])
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('sahl-') && !KEEP.has(k)) localStorage.removeItem(k)
-      })
+      await deleteTables(ALL_RESET_TABLES, Object.values(RESET_GROUPS).flatMap(g => g.localKeys))
       toast('تم مسح جميع البيانات بنجاح — جارٍ إعادة التشغيل...', 'success')
       setTimeout(() => window.location.reload(), 1800)
     } catch (e: any) {
@@ -369,40 +433,45 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          {/* Danger Zone */}
+          {/* Danger Zone — Granular Reset */}
           <div style={{ border: '2px solid var(--danger)', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ background: 'var(--danger)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <i className="fa fa-triangle-exclamation" style={{ color: '#fff', fontSize: 18 }} />
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>منطقة الخطر — إعادة التعيين الكاملة</span>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>منطقة الخطر — إعادة التعيين</span>
             </div>
             <div style={{ padding: 20, background: 'var(--danger-bg)' }}>
-              <p style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600, marginBottom: 8 }}>
-                هذا الإجراء سيحذف بشكل نهائي جميع البيانات التالية:
+              <p style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600, marginBottom: 12 }}>
+                اختر نوع البيانات التي تريد حذفها نهائياً:
               </p>
-              <ul style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16, paddingRight: 18, lineHeight: 2 }}>
-                <li>جميع الفواتير وبنودها</li>
-                <li>جميع أوامر الشراء وبنودها</li>
-                <li>جميع العملاء والموردين والمدفوعات</li>
-                <li>جميع المنتجات وحركات المخزون</li>
-                <li>جميع المصروفات والموظفين</li>
-                <li>جميع معاملات الخزينة</li>
-                <li>جميع بيانات المناديب</li>
-                <li>جميع الفئات</li>
-              </ul>
-              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
-                ✅ سيتم الاحتفاظ ببيانات الشركة وبيانات تسجيل الدخول فقط.
-              </p>
-              <button
-                className="btn"
-                disabled={resetting}
-                onClick={handleFullReset}
-                style={{ background: 'var(--danger)', color: '#fff', fontWeight: 700, border: 'none' }}
-              >
-                {resetting
-                  ? <><i className="fa fa-spinner fa-spin" /> جارٍ المسح...</>
-                  : <><i className="fa fa-trash-can" /> حذف جميع البيانات والبدء من جديد</>
-                }
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10, marginBottom: 16 }}>
+                {Object.entries(RESET_GROUPS).map(([key, group]) => (
+                  <button
+                    key={key}
+                    className="btn btn-sm btn-outline"
+                    disabled={resetting}
+                    onClick={() => handlePartialReset(key)}
+                    style={{ justifyContent: 'flex-start', gap: 8, borderColor: 'var(--danger)', color: 'var(--danger)', background: 'rgba(220,38,38,0.04)' }}
+                  >
+                    <i className={`fa ${group.icon}`} /> {group.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ borderTop: '1px solid var(--danger)', paddingTop: 16, marginTop: 8 }}>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+                  ✅ سيتم الاحتفاظ ببيانات الشركة وبيانات تسجيل الدخول فقط عند استخدام أي زر مسح.
+                </p>
+                <button
+                  className="btn"
+                  disabled={resetting}
+                  onClick={handleFullReset}
+                  style={{ background: 'var(--danger)', color: '#fff', fontWeight: 700, border: 'none' }}
+                >
+                  {resetting
+                    ? <><i className="fa fa-spinner fa-spin" /> جارٍ المسح...</>
+                    : <><i className="fa fa-trash-can" /> حذف جميع البيانات والبدء من جديد</>
+                  }
+                </button>
+              </div>
             </div>
           </div>
         </div>

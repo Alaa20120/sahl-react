@@ -4,6 +4,7 @@ import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
 import { PURCHASES, type Purchase, type PurchaseStatus } from '@/lib/mock-data/purchases'
 import { useInventoryStore } from './inventory.store'
 import { useCustomerStore } from './customer.store'
+import { useTreasuryStore } from './treasury.store'
 
 interface PurchaseStore {
   purchases: Purchase[]
@@ -175,14 +176,11 @@ export const usePurchaseStore = create<PurchaseStore>()(
             filter: 'id=eq.' + id,
             body: { paid: newPaid, status: newStatus },
           })
-          await supaFetch('treasury_transactions', {
-            method: 'POST',
-            body: {
-              date: new Date().toISOString().slice(0, 10),
-              description: `دفعة مشتريات ${purchase.id}`,
-              type: 'out', category: 'purchase', amount,
-              balance: -amount, account_id: 'cash', ref: purchase.id,
-            },
+          await useTreasuryStore.getState().addTransaction({
+            date: new Date().toISOString().slice(0, 10),
+            description: `دفعة مشتريات ${purchase.number || purchase.id}`,
+            type: 'out', category: 'purchase', amount,
+            account: 'cash', ref: purchase.id,
           })
         }
         // Decrease supplier balance when we pay

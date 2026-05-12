@@ -87,11 +87,10 @@ export const useHRStore = create<HRStore>()(
       },
 
       async addEmployee(data) {
-        const id = `EMP-${String(get().employees.length + 1).padStart(3, '0')}`
-        const employee: Employee = { ...data, id }
+        let dbId = `EMP-${String(get().employees.length + 1).padStart(3, '0')}`
 
         if (isSupabaseConfigured()) {
-          await supaFetch('employees', {
+          const inserted = await supaFetch('employees', {
             method: 'POST',
             body: {
               name: data.name,
@@ -108,7 +107,10 @@ export const useHRStore = create<HRStore>()(
               status: data.status || 'active',
             },
           })
+          const row = Array.isArray(inserted) ? inserted[0] : inserted
+          if (row?.id) dbId = row.id
         }
+        const employee: Employee = { ...data, id: dbId }
         set(state => ({ employees: [...state.employees, employee] }))
       },
 

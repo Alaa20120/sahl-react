@@ -43,7 +43,10 @@ export const useCustomerStore = create<CustomerStore>()(
         if (!isSupabaseConfigured()) return
         set({ loading: true, error: null })
         try {
-          const data = await supaFetch('customers', { select: '*', limit: 500 })
+          const [data, paymentsData] = await Promise.all([
+            supaFetch('customers', { select: '*', limit: 500 }),
+            supaFetch('customer_payments', { select: '*', limit: 2000 }),
+          ])
           const mapped = (data || []).map((c: any): Customer => ({
             id: c.id,
             name: c.name,
@@ -58,7 +61,19 @@ export const useCustomerStore = create<CustomerStore>()(
             status: c.status,
             since: c.since,
           }))
-          set({ customers: mapped, loading: false })
+          const mappedPayments = (paymentsData || []).map((p: any): CustomerPayment => ({
+            id: p.id,
+            customerId: p.customer_id,
+            date: p.date,
+            amount: Number(p.amount) || 0,
+            type: p.type,
+            method: p.method || '',
+            description: p.description || '',
+            refId: p.ref_id || '',
+            balanceBefore: Number(p.balance_before) || 0,
+            balanceAfter: Number(p.balance_after) || 0,
+          }))
+          set({ customers: mapped, payments: mappedPayments, loading: false })
         } catch (e: any) {
           set({ error: e.message, loading: false })
         }
@@ -144,11 +159,10 @@ export const useCustomerStore = create<CustomerStore>()(
       },
 
       async addPayment(payment) {
-        const id = `PAY-${Date.now()}`
+        let dbId = `PAY-${Date.now()}`
         const refId = `RCP-${Date.now()}`
-        const newPayment: CustomerPayment = { ...payment, id, refId }
         if (isSupabaseConfigured()) {
-          await supaFetch('customer_payments', {
+          const inserted = await supaFetch('customer_payments', {
             method: 'POST',
             body: {
               customer_id: payment.customerId,
@@ -162,7 +176,10 @@ export const useCustomerStore = create<CustomerStore>()(
               balance_after: payment.balanceAfter,
             },
           })
+          const row = Array.isArray(inserted) ? inserted[0] : inserted
+          if (row?.id) dbId = row.id
         }
+        const newPayment: CustomerPayment = { ...payment, id: dbId, refId }
         set(state => ({
           payments: [newPayment, ...state.payments],
           customers: state.customers.map(c =>

@@ -192,14 +192,11 @@ export const useInvoiceStore = create<InvoiceStore>()(
             filter: 'id=eq.' + id,
             body: { paid_amount: newPaid, status: newStatus },
           })
-          await supaFetch('treasury_transactions', {
-            method: 'POST',
-            body: {
-              date: new Date().toISOString().slice(0, 10),
-              description: `دفعة فاتورة ${invoice.number}`,
-              type: 'in', category: 'collection', amount,
-              balance: amount, account_id: 'cash', ref: invoice.number,
-            },
+          await useTreasuryStore.getState().addTransaction({
+            date: new Date().toISOString().slice(0, 10),
+            description: `دفعة فاتورة ${invoice.number}`,
+            type: 'in', category: 'collection', amount,
+            account: 'cash', ref: invoice.number,
           })
         }
         set(state => ({ invoices: state.invoices.map(inv => inv.id === id ? { ...inv, paidAmount: newPaid, status: newStatus } : inv) }))

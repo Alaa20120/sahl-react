@@ -50,11 +50,10 @@ export const useExpenseStore = create<ExpenseStore>()(
       },
 
       async addExpense(data) {
-        const id = `EXP-${String(get().expenses.length + 1).padStart(3, '0')}`
-        const expense: Expense = { ...data, id }
+        let dbId = `EXP-${String(get().expenses.length + 1).padStart(3, '0')}`
 
         if (isSupabaseConfigured()) {
-          await supaFetch('expenses', {
+          const inserted = await supaFetch('expenses', {
             method: 'POST',
             body: {
               date: data.date,
@@ -66,7 +65,10 @@ export const useExpenseStore = create<ExpenseStore>()(
               status: data.status || 'pending',
             },
           })
+          const row = Array.isArray(inserted) ? inserted[0] : inserted
+          if (row?.id) dbId = row.id
         }
+        const expense: Expense = { ...data, id: dbId }
         set(state => ({ expenses: [expense, ...state.expenses] }))
       },
 

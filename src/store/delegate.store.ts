@@ -167,29 +167,16 @@ export const useDelegateStore = create<DelegateStore>()(
       },
 
       async addDelegate({ name, phone, email, zone, username, password, baseSalary, commissionRate }) {
-        const id = `DEL-${Date.now()}`
         const avatar = name.split(' ').slice(0, 2).map(w => w[0]).join('')
         const finalUsername = username?.trim() || generateUsername(name)
         const finalPassword = password || generatePassword()
-        const newDel: Delegate = {
-          id, name, phone, email, zone,
-          status: 'active',
-          username: finalUsername,
-          password: finalPassword,
-          avatar,
-          location: { lat: 24.7136, lng: 46.6753, address: 'غير محدد', timestamp: new Date().toISOString() },
-          locationHistory: [],
-          warehouse: [], invoices: [], transactions: [],
-          stats: { totalSales: 0, totalPurchases: 0, collected: 0, balance: 0, externalCredit: 0, expenses: 0, companyEntrusted: 0 },
-          baseSalary: baseSalary || 4000,
-          commissionRate: commissionRate || 5,
-        }
+        let dbId = `DEL-${Date.now()}`
 
         if (isSupabaseConfigured()) {
           const inserted = await supaFetch('delegates', {
             method: 'POST',
             body: {
-              id, name,
+              name,
               phone: phone || null,
               email: email || null,
               zone: zone || null,
@@ -204,7 +191,21 @@ export const useDelegateStore = create<DelegateStore>()(
           })
           const row = Array.isArray(inserted) ? inserted[0] : inserted
           if (!row?.id) throw new Error('لم يتم التأكد من الحفظ في قاعدة البيانات')
-          newDel.id = row.id
+          dbId = row.id
+        }
+
+        const newDel: Delegate = {
+          id: dbId, name, phone, email, zone,
+          status: 'active',
+          username: finalUsername,
+          password: finalPassword,
+          avatar,
+          location: { lat: 24.7136, lng: 46.6753, address: 'غير محدد', timestamp: new Date().toISOString() },
+          locationHistory: [],
+          warehouse: [], invoices: [], transactions: [],
+          stats: { totalSales: 0, totalPurchases: 0, collected: 0, balance: 0, externalCredit: 0, expenses: 0, companyEntrusted: 0 },
+          baseSalary: baseSalary || 4000,
+          commissionRate: commissionRate || 5,
         }
         set(state => ({ delegates: [...state.delegates, newDel] }))
         return newDel
@@ -427,7 +428,7 @@ export const useDelegateStore = create<DelegateStore>()(
             }
           } catch { /* use local count */ }
         }
-        const newInvoice: DelegateInvoice = { ...invoice, id: `DINV-${Date.now()}`, number: `${prefix}${String(seq).padStart(3, '0')}` }
+        let newInvoice: DelegateInvoice = { ...invoice, id: `DINV-${Date.now()}`, number: `${prefix}${String(seq).padStart(3, '0')}` }
 
         if (isSupabaseConfigured()) {
           const { data: inserted } = await supabase.from('delegate_invoices').insert({
@@ -437,10 +438,13 @@ export const useDelegateStore = create<DelegateStore>()(
             paid_amount: invoice.paidAmount || 0, status: invoice.status,
             payment_method: invoice.paymentMethod || null,
           }).select().single()
-          if (inserted && invoice.items.length > 0) {
-            await supabase.from('delegate_invoice_items').insert(
-              invoice.items.map(it => ({ invoice_id: inserted.id, product_id: it.productId || null, description: it.description, qty: it.qty, price: it.price, total: it.total }))
-            )
+          if (inserted) {
+            newInvoice = { ...newInvoice, id: inserted.id }
+            if (invoice.items.length > 0) {
+              await supabase.from('delegate_invoice_items').insert(
+                invoice.items.map(it => ({ invoice_id: inserted.id, product_id: it.productId || null, description: it.description, qty: it.qty, price: it.price, total: it.total }))
+              )
+            }
           }
         }
 

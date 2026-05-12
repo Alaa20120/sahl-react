@@ -191,7 +191,6 @@ export const useInventoryStore = create<InventoryStore>()(
           const result = await supaFetch('products', {
             method: 'POST',
             body: {
-              id: product.id,
               sku: product.sku,
               name: product.name,
               category: product.category || null,

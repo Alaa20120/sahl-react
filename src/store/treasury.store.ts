@@ -72,18 +72,11 @@ export const useTreasuryStore = create<TreasuryStore>()(
         else acc.balance -= data.amount
         accounts[accountIndex] = acc
 
-        const newTx: Transaction = {
-          id: `TX-${new Date().getFullYear()}-${String(state.transactions.length + 1).padStart(3, '0')}`,
-          ...data,
-          balance: acc.balance,
-        }
+        let dbId = `TX-${new Date().getFullYear()}-${String(state.transactions.length + 1).padStart(3, '0')}`
 
-        // Update local state immediately
-        set({ transactions: [newTx, ...state.transactions], accounts })
-
-        // Persist to Supabase
+        // Persist to Supabase first to get real ID
         if (isSupabaseConfigured()) {
-          await supaFetch('treasury_transactions', {
+          const inserted = await supaFetch('treasury_transactions', {
             method: 'POST',
             body: {
               date: data.date,
@@ -96,12 +89,23 @@ export const useTreasuryStore = create<TreasuryStore>()(
               ref: data.ref || null,
             },
           })
+          const row = Array.isArray(inserted) ? inserted[0] : inserted
+          if (row?.id) dbId = row.id
           await supaFetch('treasury_accounts', {
             method: 'PATCH',
             filter: 'id=eq.' + data.account,
             body: { balance: acc.balance },
           })
         }
+
+        const newTx: Transaction = {
+          id: dbId,
+          ...data,
+          balance: acc.balance,
+        }
+
+        // Update local state
+        set({ transactions: [newTx, ...state.transactions], accounts })
       },
     }),
     { name: 'sahl-treasury-v3' }

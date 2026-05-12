@@ -147,7 +147,18 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 9. delegates
+-- 9. categories table (used by category.store.ts)
+CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "categories_select" ON categories FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "categories_write" ON categories FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 10. delegates
 CREATE TABLE IF NOT EXISTS delegates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL, phone TEXT, email TEXT, zone TEXT,
@@ -178,6 +189,7 @@ CREATE TABLE IF NOT EXISTS delegate_invoices (
   paid_amount DECIMAL(12,2) DEFAULT 0,
   status TEXT DEFAULT 'pending' CHECK (status IN ('paid','pending','overdue','confirmed')),
   payment_method TEXT CHECK (payment_method IN ('cash','credit')), confirmed_at DATE,
+  void_reason TEXT, voided_at DATE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -372,3 +384,59 @@ CREATE TABLE IF NOT EXISTS company_settings (
 ALTER TABLE company_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "company_settings_select" ON company_settings FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "company_settings_write" ON company_settings FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 23. RLS for remaining tables (invoice_items, purchase_items, stock_movements, customer_payments, invoice_attachments)
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "invoice_items_select" ON invoice_items FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "invoice_items_write" ON invoice_items FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE purchase_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "purchase_items_select" ON purchase_items FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "purchase_items_write" ON purchase_items FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "stock_movements_select" ON stock_movements FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "stock_movements_write" ON stock_movements FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE customer_payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "customer_payments_select" ON customer_payments FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "customer_payments_write" ON customer_payments FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE invoice_attachments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "invoice_attachments_select" ON invoice_attachments FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "invoice_attachments_write" ON invoice_attachments FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 24. RLS for delegate tables
+ALTER TABLE delegate_warehouse ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "delegate_warehouse_select" ON delegate_warehouse FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "delegate_warehouse_write" ON delegate_warehouse FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE delegate_invoices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "delegate_invoices_select" ON delegate_invoices FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "delegate_invoices_write" ON delegate_invoices FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE delegate_invoice_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "delegate_invoice_items_select" ON delegate_invoice_items FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "delegate_invoice_items_write" ON delegate_invoice_items FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE delegate_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "delegate_transactions_select" ON delegate_transactions FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "delegate_transactions_write" ON delegate_transactions FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 25. RLS for accounting tables
+ALTER TABLE chart_of_accounts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "chart_of_accounts_select" ON chart_of_accounts FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "chart_of_accounts_write" ON chart_of_accounts FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "journal_entries_select" ON journal_entries FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "journal_entries_write" ON journal_entries FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+ALTER TABLE journal_entry_lines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "journal_entry_lines_select" ON journal_entry_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "journal_entry_lines_write" ON journal_entry_lines FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 26. RLS for ZATCA
+ALTER TABLE zatca_invoices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "zatca_invoices_select" ON zatca_invoices FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "zatca_invoices_write" ON zatca_invoices FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));

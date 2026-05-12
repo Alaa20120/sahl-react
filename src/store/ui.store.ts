@@ -16,7 +16,7 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   notifOpen: false,
   searchOpen: false,
-  notifCount: 5,
+  notifCount: 0,
   sidebarCollapsed: false,
   openNotif: () => set({ notifOpen: true }),
   closeNotif: () => set({ notifOpen: false }),

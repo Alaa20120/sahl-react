@@ -16,6 +16,6 @@ export interface FixedAsset {
   monthlyRent?: number
 }
 
-export const ASSET_CATEGORIES = ['الكل', 'أجهزة كمبيوتر', 'معدات مكتبية', 'سيارات', 'أثاث', 'معدات طباعة']
+export const ASSET_CATEGORIES: string[] = []
 
 export const FIXED_ASSETS: FixedAsset[] = []

@@ -18,6 +18,6 @@ export interface POSSale {
 
 export const POS_PRODUCTS: POSProduct[] = []
 
-export const POS_CATEGORIES = ['الكل', 'مكتبية', 'أدوات', 'طباعة', 'تخزين']
+export const POS_CATEGORIES: string[] = []
 
 export const RECENT_SALES: POSSale[] = []

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
-import { EXPENSES, type Expense, type ExpenseStatus } from '@/lib/mock-data/expenses'
+import { type Expense, type ExpenseStatus } from '@/lib/mock-data/expenses'
 import { useTreasuryStore } from './treasury.store'
 
 interface ExpenseStore {
@@ -24,7 +24,7 @@ const currentMonth = new Date().toISOString().slice(0, 7)
 export const useExpenseStore = create<ExpenseStore>()(
   persist(
     (set, get) => ({
-      expenses: EXPENSES,
+      expenses: [],
       loading: false,
       error: null,
 

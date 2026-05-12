@@ -117,14 +117,13 @@ ${isVoided ? '<div class="voided-stamp">ملغاة — VOIDED</div>' : ''}
       <div class="info-box">
         <div class="info-label">فاتورة إلى</div>
         <div style="font-weight:800;font-size:15px">${invoice.customer}</div>
-        <div style="font-size:12px;color:#6B7280;margin-top:4px">الرياض، المملكة العربية السعودية</div>
-        <div style="font-size:12px;color:#6B7280">الرقم الضريبي: 300000000000000</div>
+        <div style="font-size:12px;color:#6B7280;margin-top:4px">الرقم الضريبي: ${co?.vat || ''}</div>
       </div>
       <div class="info-box">
         <div class="info-label">بيانات الدفع</div>
         <div style="font-size:12px;line-height:1.8">
-          <div>البنك الأهلي السعودي</div>
-          <div style="color:#6B7280;font-size:11px">IBAN: SA12 2000 0000 0000 0000 0000</div>
+          <div>${co?.name || ''}</div>
+          <div style="color:#6B7280;font-size:11px">${co?.address || ''}</div>
         </div>
         <div style="margin-top:10px">
           <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:${status === 'paid' ? '#ECFDF5' : status === 'overdue' ? '#FEF2F2' : '#FFFBEB'};color:${status === 'paid' ? '#065f46' : status === 'overdue' ? '#991b1b' : '#92400e'}">
@@ -486,8 +485,8 @@ export default function InvoiceDetailPage() {
               <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: tpl.accentColor, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>بيانات الدفع</div>
                 <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-                  <div>البنك الأهلي السعودي</div>
-                  <div style={{ color: 'var(--muted)', fontSize: 11 }}>IBAN: SA12 2000 0000 0000 0000 0000</div>
+                  <div>{co?.name || ''}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 11 }}>{co?.address || ''}</div>
                 </div>
                 <div style={{ marginTop: 10 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: isVoided ? 'var(--danger)' : STATUS_COLORS[status], background: (isVoided ? 'var(--danger)' : STATUS_COLORS[status]) + '18', borderRadius: 6, padding: '3px 10px' }}>

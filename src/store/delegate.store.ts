@@ -156,7 +156,7 @@ export const useDelegateStore = create<DelegateStore>()(
                 expenses: Number(d.stats_expenses) || 0,
                 companyEntrusted: Number(d.stats_company_entrusted) || 0,
               },
-              baseSalary: Number(d.base_salary) || 4000,
+              baseSalary: Number(d.base_salary) || 0,
               commissionRate: Number(d.commission_rate) || 5,
             }
           })
@@ -184,7 +184,7 @@ export const useDelegateStore = create<DelegateStore>()(
               password_hash: finalPassword,
               avatar,
               status: 'active',
-              base_salary: baseSalary || 4000,
+              base_salary: baseSalary || 0,
               commission_rate: commissionRate || 5,
             },
             select: 'id',
@@ -204,7 +204,7 @@ export const useDelegateStore = create<DelegateStore>()(
           locationHistory: [],
           warehouse: [], invoices: [], transactions: [],
           stats: { totalSales: 0, totalPurchases: 0, collected: 0, balance: 0, externalCredit: 0, expenses: 0, companyEntrusted: 0 },
-          baseSalary: baseSalary || 4000,
+          baseSalary: baseSalary || 0,
           commissionRate: commissionRate || 5,
         }
         set(state => ({ delegates: [...state.delegates, newDel] }))

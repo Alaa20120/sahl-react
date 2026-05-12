@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch, supabase } from '@/lib/supabase'
-import { EMPLOYEES, type Employee } from '@/lib/mock-data/hr'
+import { type Employee } from '@/lib/mock-data/hr'
 import { useTreasuryStore } from './treasury.store'
 
 interface SalaryPayment {
@@ -54,7 +54,7 @@ interface HRStore {
 export const useHRStore = create<HRStore>()(
   persist(
     (set, get) => ({
-      employees: EMPLOYEES,
+      employees: [],
       salaryPayments: [],
       payrollOverrides: {},
       loading: false,

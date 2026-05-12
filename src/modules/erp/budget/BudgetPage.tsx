@@ -7,20 +7,10 @@ import { toast } from '@/lib/toast'
 import { useExpenseStore } from '@/store/expense.store'
 import { useInvoiceStore } from '@/store/invoice.store'
 
-// Budget targets per category (static targets)
-const BUDGET_TARGETS: Record<string, number> = {
-  'رواتب': 160000,
-  'إيجار': 15000,
-  'مكتبية': 8000,
-  'نقل وتنقل': 6000,
-  'ضيافة': 5000,
-  'صيانة': 5000,
-  'اتصالات': 3000,
-  'تسويق': 15000,
-  'أخرى': 5000,
-}
+// Budget targets per category (loaded from Supabase in future)
+const BUDGET_TARGETS: Record<string, number> = {}
 
-const REVENUE_TARGET = 350000
+const REVENUE_TARGET = 0
 
 export default function BudgetPage() {
   const expenses = useExpenseStore(s => s.expenses)

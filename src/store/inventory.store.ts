@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
-import { type Product, type Withdrawal, PRODUCTS, WITHDRAWALS } from '@/lib/mock-data/inventory'
+import { type Product, type Withdrawal } from '@/lib/mock-data/inventory'
 
 interface InventoryStore {
   products: Product[]
@@ -29,8 +29,8 @@ interface InventoryStore {
 export const useInventoryStore = create<InventoryStore>()(
   persist(
     (set, get) => ({
-      products: PRODUCTS,
-      withdrawals: WITHDRAWALS,
+      products: [],
+      withdrawals: [],
       loading: false,
       error: null,
 

@@ -12,7 +12,7 @@ export interface Expense {
   status: ExpenseStatus
 }
 
-export const EXPENSE_CATEGORIES = ['الكل', 'مكتبية', 'نقل وتنقل', 'ضيافة', 'إيجار', 'صيانة', 'اتصالات', 'رواتب', 'تسويق', 'أخرى']
+export const EXPENSE_CATEGORIES: string[] = []
 
 export const EXPENSES: Expense[] = []
 

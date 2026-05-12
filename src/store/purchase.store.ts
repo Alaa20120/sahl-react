@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
-import { PURCHASES, type Purchase, type PurchaseStatus } from '@/lib/mock-data/purchases'
+import { type Purchase, type PurchaseStatus } from '@/lib/mock-data/purchases'
 import { useInventoryStore } from './inventory.store'
 import { useCustomerStore } from './customer.store'
 import { useTreasuryStore } from './treasury.store'
@@ -23,7 +23,7 @@ interface PurchaseStore {
 export const usePurchaseStore = create<PurchaseStore>()(
   persist(
     (set, get) => ({
-      purchases: PURCHASES,
+      purchases: [],
       yearCounters: {},
       loading: false,
       error: null,

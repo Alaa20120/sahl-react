@@ -18,4 +18,4 @@ export interface Employee {
 
 export const EMPLOYEES: Employee[] = []
 
-export const DEPARTMENTS = ['الكل', 'المبيعات', 'المالية', 'التقنية', 'HR', 'التسويق', 'العمليات', 'الإدارة']
+export const DEPARTMENTS: string[] = []

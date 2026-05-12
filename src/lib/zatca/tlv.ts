@@ -56,6 +56,10 @@ import { useAppStore } from '@/store/app.store'
 export const COMPANY_INFO = {
   get name() { return useAppStore.getState().company.name || '—' },
   get vatNumber() { return useAppStore.getState().company.vat || '—' },
+  get address() { return useAppStore.getState().company.address || '' },
+  get city() { return useAppStore.getState().company.city || '' },
+  get buildingNumber() { return useAppStore.getState().company.buildingNumber || '' },
+  get postalCode() { return useAppStore.getState().company.postalCode || '' },
 }
 
 

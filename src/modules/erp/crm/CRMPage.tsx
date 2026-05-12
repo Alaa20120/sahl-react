@@ -23,15 +23,7 @@ const STAGES = {
   lost:     { label: 'خسارة',       color: '#EF4444' },
 }
 
-const DEALS: Deal[] = [
-  { id: '1', name: 'نظام ERP متكامل', company: 'شركة الأفق', amount: 85000, stage: 'proposal', owner: 'أحمد', date: '2025-05-15', priority: 'high' },
-  { id: '2', name: 'حزمة محاسبة سنوية', company: 'مؤسسة النور', amount: 24000, stage: 'contact', owner: 'عمر', date: '2025-05-20', priority: 'medium' },
-  { id: '3', name: 'POS لمتجرين', company: 'متاجر السعادة', amount: 18500, stage: 'nego', owner: 'أحمد', date: '2025-05-10', priority: 'high' },
-  { id: '4', name: 'اشتراك سنوي', company: 'شركة البنيان', amount: 12000, stage: 'won', owner: 'عمر', date: '2025-04-28', priority: 'low' },
-  { id: '5', name: 'نظام الفنادق', company: 'فندق الواحة', amount: 55000, stage: 'lead', owner: 'ريم', date: '2025-05-30', priority: 'medium' },
-  { id: '6', name: 'موديول المخزون', company: 'شركة الخليج', amount: 9500, stage: 'lost', owner: 'أحمد', date: '2025-04-15', priority: 'low' },
-  { id: '7', name: 'نظام HR كامل', company: 'مجموعة الرواد', amount: 38000, stage: 'proposal', owner: 'ريم', date: '2025-05-25', priority: 'high' },
-]
+const DEALS: Deal[] = []
 
 export default function CRMPage() {
   const [deals, setDeals] = useState<Deal[]>(DEALS)

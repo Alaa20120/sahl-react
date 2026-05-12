@@ -2,14 +2,7 @@ import PageHeader from '@/components/ui/PageHeader'
 import Card from '@/components/ui/Card'
 import { fmt } from '@/lib/format'
 
-const TENANTS = [
-  { id: 'T001', name: 'شركة الرواد التجارية',       plan: 'Premium', users: 12, status: 'active',   revenue: 1200,  since: '2024-01', modules: ['ERP','HR','CRM'] },
-  { id: 'T002', name: 'مؤسسة الإبداع الرقمي',       plan: 'Basic',   users: 4,  status: 'active',   revenue: 350,   since: '2024-03', modules: ['ERP'] },
-  { id: 'T003', name: 'مجموعة الخليج للاستثمار',    plan: 'Enterprise',users:45, status: 'active',   revenue: 4500,  since: '2023-08', modules: ['ERP','HR','CRM','Hotel'] },
-  { id: 'T004', name: 'شركة البناء الحديث',          plan: 'Basic',   users: 3,  status: 'trial',    revenue: 0,     since: '2025-04', modules: ['ERP'] },
-  { id: 'T005', name: 'مؤسسة التميز للخدمات',       plan: 'Premium', users: 8,  status: 'active',   revenue: 800,   since: '2024-06', modules: ['ERP','CRM'] },
-  { id: 'T006', name: 'نخبة العقارات',               plan: 'Premium', users: 6,  status: 'suspended',revenue: 0,     since: '2024-01', modules: ['ERP'] },
-]
+const TENANTS: any[] = []
 
 const PLAN_COLORS: Record<string, string> = {
   Basic: '#6B7280', Premium: '#2563EB', Enterprise: '#7C3AED',
@@ -90,7 +83,7 @@ export default function AdminDashboard() {
                   <td style={{ textAlign: 'center', fontWeight: 600 }}>{t.users}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {t.modules.map(m => (
+                      {t.modules.map((m: string) => (
                         <span key={m} style={{ fontSize: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{m}</span>
                       ))}
                     </div>

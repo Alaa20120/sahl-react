@@ -28,7 +28,7 @@ export const PRODUCTS: Product[] = []
 
 export const WITHDRAWALS: Withdrawal[] = []
 
-export const CATEGORIES = ['الكل', 'مكتبية', 'تقنية', 'معدات', 'أثاث']
+export const CATEGORIES: string[] = []
 
 export function getProductWithdrawals(productId: string): Withdrawal[] {
   return WITHDRAWALS.filter(w => w.productId === productId)

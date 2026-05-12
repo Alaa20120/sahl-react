@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
-import { TRANSACTIONS, ACCOUNTS, type Transaction, type TxCategory, type TxType } from '@/lib/mock-data/treasury'
+import { type Transaction, type TxCategory, type TxType } from '@/lib/mock-data/treasury'
 
 interface TreasuryAccount {
   id: string
@@ -24,8 +24,8 @@ interface TreasuryStore {
 export const useTreasuryStore = create<TreasuryStore>()(
   persist(
     (set, get) => ({
-      transactions: TRANSACTIONS,
-      accounts: ACCOUNTS,
+      transactions: [],
+      accounts: [],
       loading: false,
       error: null,
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
-import { INVOICES, type Invoice, type InvoiceStatus, getNextInvoiceNumber, generateBarcode } from '@/lib/mock-data/invoices'
+import { type Invoice, type InvoiceStatus, getNextInvoiceNumber, generateBarcode } from '@/lib/mock-data/invoices'
 import { useInventoryStore } from './inventory.store'
 import { useCustomerStore } from './customer.store'
 import { useTreasuryStore } from './treasury.store'
@@ -28,7 +28,7 @@ const initialCounter = 0
 export const useInvoiceStore = create<InvoiceStore>()(
   persist(
     (set, get) => ({
-      invoices: INVOICES,
+      invoices: [],
       globalCounter: initialCounter,
       loading: false,
       error: null,

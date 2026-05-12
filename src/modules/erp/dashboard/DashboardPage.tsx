@@ -96,7 +96,7 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="لوحة التحكم"
-        subtitle={`مرحباً، أحمد — ${new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
+        subtitle={`${new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
       />
 
       {/* AI Insights */}

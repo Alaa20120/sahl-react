@@ -4,9 +4,9 @@ import Card from '@/components/ui/Card'
 import { toast } from '@/lib/toast'
 
 export default function DelegateSettingsPage() {
-  const [name, setName] = useState('فهد سالم الدوسري')
-  const [phone, setPhone] = useState('0504444444')
-  const [zone, setZone] = useState('الرياض - الشمال')
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [zone, setZone] = useState('')
 
   function handleSave() {
     toast('تم حفظ الإعدادات بنجاح', 'success')

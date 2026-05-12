@@ -13,6 +13,8 @@ export interface CompanyInfo {
   city: string
   country: string
   logo: string | null
+  buildingNumber?: string
+  postalCode?: string
 }
 
 interface AppState {

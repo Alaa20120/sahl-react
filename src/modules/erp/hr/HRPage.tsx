@@ -125,7 +125,7 @@ export default function HRPage() {
     // 2. Delegates (Dynamic base salary + commission rate)
     delegates.forEach(del => {
       if (del.status !== 'active') return
-      const baseSalary = del.baseSalary || 4000
+      const baseSalary = del.baseSalary || 0
       const commissionRate = (del.commissionRate || 5) / 100
       const commission = del.stats.totalSales * commissionRate
       const delAdvances = expenses.filter((ex: Expense) => ex.type === 'advance' && ex.employee === del.name && ex.status === 'approved').reduce((s, ex) => s + ex.amount, 0)

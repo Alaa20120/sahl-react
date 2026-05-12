@@ -124,11 +124,11 @@ export function generateZATCAXML(input: ZATCAXMLInput): string {
         <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
       </cac:PartyTaxScheme>
       <cac:PostalAddress>
-        <cbc:StreetName>شارع الملك فهد</cbc:StreetName>
-        <cbc:BuildingNumber>1234</cbc:BuildingNumber>
-        <cbc:CitySubdivisionName>الرياض</cbc:CitySubdivisionName>
-        <cbc:CityName>الرياض</cbc:CityName>
-        <cbc:PostalZone>11564</cbc:PostalZone>
+        <cbc:StreetName>${escapeXml(COMPANY_INFO.address || '')}</cbc:StreetName>
+        <cbc:BuildingNumber>${escapeXml(COMPANY_INFO.buildingNumber || '')}</cbc:BuildingNumber>
+        <cbc:CitySubdivisionName>${escapeXml(COMPANY_INFO.city || '')}</cbc:CitySubdivisionName>
+        <cbc:CityName>${escapeXml(COMPANY_INFO.city || '')}</cbc:CityName>
+        <cbc:PostalZone>${escapeXml(COMPANY_INFO.postalCode || '')}</cbc:PostalZone>
         <cac:Country><cbc:IdentificationCode>SA</cbc:IdentificationCode></cac:Country>
       </cac:PostalAddress>
     </cac:Party>

@@ -225,7 +225,7 @@ export default function Register() {
               <div className="auth-sub">ستكون هذه بيانات الدخول الرئيسية</div>
               <div className="form-group">
                 <label className="form-label">الاسم الكامل *</label>
-                <input className="form-control" value={form.name} onChange={set('name')} placeholder="أحمد محمد العمري" />
+                <input className="form-control" value={form.name} onChange={set('name')} placeholder="الاسم الكامل" />
               </div>
               <div className="form-group">
                 <label className="form-label">البريد الإلكتروني *</label>

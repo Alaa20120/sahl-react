@@ -271,7 +271,7 @@ export default function DelegatesListPage() {
         <div className="form-grid-2">
           <div className="form-group col-span-2">
             <label className="form-label">اسم المندوب</label>
-            <input className="form-control" placeholder="مثال: أحمد محمد" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            <input className="form-control" placeholder="اسم المندوب" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
           <div className="form-group">
             <label className="form-label">رقم الهاتف</label>

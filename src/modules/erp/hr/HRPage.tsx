@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Expense } from '@/lib/mock-data/expenses'
 import PageHeader from '@/components/ui/PageHeader'
@@ -55,6 +55,9 @@ export default function HRPage() {
   const employees = useHRStore(s => s.employees)
   const addEmployee = useHRStore(s => s.addEmployee)
   const updateEmployee = useHRStore(s => s.updateEmployee)
+  const payrollOverrides = useHRStore(s => s.payrollOverrides)
+  const savePayrollOverride = useHRStore(s => s.savePayrollOverride)
+  const fetchPayrollOverrides = useHRStore(s => s.fetchPayrollOverrides)
   const delegates = useDelegateStore(s => s.delegates)
   const addTransaction = useTreasuryStore(s => s.addTransaction)
   const accounts = useTreasuryStore(s => s.accounts)
@@ -70,6 +73,10 @@ export default function HRPage() {
   const [showNewExpense, setShowNewExpense] = useState(false)
   const [expenseForm, setExpenseForm] = useState({ type: 'سلفة', employee: '', amount: '', reason: '', account: 'cash' })
   const [payrollRun, setPayrollRun] = useState(false)
+
+  // ── Payroll edit overrides ──
+  const [editPayrollItem, setEditPayrollItem] = useState<any | null>(null)
+  const [editPayrollForm, setEditPayrollForm] = useState({ basic: '', allowances: '', deductions: '', advance: '' })
 
   // Use expense store instead of local state
   const expenses = expenseStore.expenses
@@ -130,8 +137,17 @@ export default function HRPage() {
       })
     })
 
-    return items
-  }, [delegates, expenses])
+    // Apply manual overrides
+    return items.map(item => {
+      const ov = payrollOverrides[item.id]
+      if (!ov) return item
+      const basic = ov.basic !== undefined ? ov.basic : item.basic
+      const allowances = ov.allowances !== undefined ? ov.allowances : item.allowances
+      const deductions = ov.deductions !== undefined ? ov.deductions : item.deductions
+      const advance = ov.advance !== undefined ? ov.advance : item.advance
+      return { ...item, basic, allowances, deductions, advance, net: basic + allowances - deductions - advance }
+    })
+  }, [employees, expenses, delegates, payrollOverrides])
 
   const totalPayrollNet = payrollItems.reduce((s, item) => s + item.net, 0)
   const salaryPayments = useHRStore(s => s.salaryPayments)
@@ -149,6 +165,10 @@ export default function HRPage() {
 
   const currentMonth = new Date().toISOString().slice(0, 7)
   const [payrollMonth, setPayrollMonth] = useState(currentMonth)
+
+  useEffect(() => {
+    fetchPayrollOverrides(payrollMonth)
+  }, [payrollMonth, fetchPayrollOverrides])
 
   async function handleRunPayroll() {
     if (payrollItems.length === 0) {
@@ -481,7 +501,7 @@ export default function HRPage() {
             <div className="table-wrap mb-4">
               <table>
                 <thead>
-                  <tr><th>الاسم</th><th>النوع</th><th>الأساسي</th><th>البدلات/العمولة</th><th>الاستقطاعات</th><th>سلف مخصومة</th><th>الصافي</th></tr>
+                  <tr><th>الاسم</th><th>النوع</th><th>الأساسي</th><th>البدلات/العمولة</th><th>الاستقطاعات</th><th>سلف مخصومة</th><th>الصافي</th><th style={{ textAlign: 'center' }}>تعديل</th></tr>
                 </thead>
                 <tbody>
                   {payrollItems.map(item => (
@@ -493,6 +513,19 @@ export default function HRPage() {
                       <td style={{ color: 'var(--danger)' }}>-{fmt(item.deductions)}</td>
                       <td style={{ color: 'var(--warn)' }}>{item.advance > 0 ? `-${fmt(item.advance)}` : '0'}</td>
                       <td style={{ fontWeight: 800, color: 'var(--primary)' }}>{fmt(item.net)}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button className="btn btn-sm btn-outline" onClick={() => {
+                          setEditPayrollItem(item)
+                          setEditPayrollForm({
+                            basic: String(item.basic),
+                            allowances: String(item.allowances),
+                            deductions: String(item.deductions),
+                            advance: String(item.advance),
+                          })
+                        }}>
+                          <i className="fa fa-pen" /> تعديل
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -504,6 +537,53 @@ export default function HRPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── Edit Payroll Modal ── */}
+      {editPayrollItem && (
+        <Modal open={!!editPayrollItem} title={`تعديل راتب — ${editPayrollItem.name}`} onClose={() => setEditPayrollItem(null)}>
+          <div style={{ display: 'grid', gap: 14, padding: '10px 0' }}>
+            <div>
+              <label className="form-label">الراتب الأساسي</label>
+              <input type="number" className="form-control" value={editPayrollForm.basic} onChange={e => setEditPayrollForm({ ...editPayrollForm, basic: e.target.value })} />
+            </div>
+            <div>
+              <label className="form-label">البدلات / العمولة</label>
+              <input type="number" className="form-control" value={editPayrollForm.allowances} onChange={e => setEditPayrollForm({ ...editPayrollForm, allowances: e.target.value })} />
+            </div>
+            <div>
+              <label className="form-label">الاستقطاعات</label>
+              <input type="number" className="form-control" value={editPayrollForm.deductions} onChange={e => setEditPayrollForm({ ...editPayrollForm, deductions: e.target.value })} />
+            </div>
+            <div>
+              <label className="form-label">سلفة مخصومة</label>
+              <input type="number" className="form-control" value={editPayrollForm.advance} onChange={e => setEditPayrollForm({ ...editPayrollForm, advance: e.target.value })} />
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
+                const basic = parseFloat(editPayrollForm.basic) || 0
+                const allowances = parseFloat(editPayrollForm.allowances) || 0
+                const deductions = parseFloat(editPayrollForm.deductions) || 0
+                const advance = parseFloat(editPayrollForm.advance) || 0
+                savePayrollOverride({
+                  personId: editPayrollItem.id,
+                  employeeId: editPayrollItem.type === 'موظف' ? editPayrollItem.id : undefined,
+                  delegateId: editPayrollItem.type === 'مندوب' ? editPayrollItem.id : undefined,
+                  month: payrollMonth,
+                  basicSalary: basic,
+                  allowances,
+                  deductions,
+                  advance,
+                })
+                setEditPayrollItem(null)
+                toast('تم تعديل بيانات الراتب وحفظها', 'success')
+              }}>
+                <i className="fa fa-save" /> حفظ
+              </button>
+              <button className="btn btn-outline" onClick={() => setEditPayrollItem(null)}>إلغاء</button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* ── Salary History Tab ── */}

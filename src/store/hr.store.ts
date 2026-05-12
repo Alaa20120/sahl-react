@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { isSupabaseConfigured, supaFetch } from '@/lib/supabase'
+import { isSupabaseConfigured, supaFetch, supabase } from '@/lib/supabase'
 import { EMPLOYEES, type Employee } from '@/lib/mock-data/hr'
 import { useTreasuryStore } from './treasury.store'
 
@@ -17,9 +17,21 @@ interface SalaryPayment {
   paidAt: string
 }
 
+interface PayrollOverride {
+  id: string
+  employeeId?: string
+  delegateId?: string
+  month: string
+  basicSalary?: number
+  allowances?: number
+  deductions?: number
+  advance?: number
+}
+
 interface HRStore {
   employees: Employee[]
   salaryPayments: SalaryPayment[]
+  payrollOverrides: Record<string, { basic?: number; allowances?: number; deductions?: number; advance?: number }>
   loading: boolean
   error: string | null
 
@@ -33,6 +45,10 @@ interface HRStore {
   getEmployeeSalaryHistory: (employeeId: string) => SalaryPayment[]
   getMonthSalaryPayments: (month: string) => SalaryPayment[]
   runPayroll: (month: string, items: { employeeId?: string; delegateId?: string; name: string; basicSalary: number; allowances: number; deductions: number; netSalary: number }[]) => Promise<void>
+
+  // Payroll override operations
+  fetchPayrollOverrides: (month: string) => Promise<void>
+  savePayrollOverride: (data: { personId: string; employeeId?: string; delegateId?: string; month: string; basicSalary?: number; allowances?: number; deductions?: number; advance?: number }) => Promise<void>
 }
 
 export const useHRStore = create<HRStore>()(
@@ -40,6 +56,7 @@ export const useHRStore = create<HRStore>()(
     (set, get) => ({
       employees: EMPLOYEES,
       salaryPayments: [],
+      payrollOverrides: {},
       loading: false,
       error: null,
 
@@ -185,6 +202,60 @@ export const useHRStore = create<HRStore>()(
             netSalary: item.netSalary,
           })
         }
+      },
+
+      async fetchPayrollOverrides(month: string) {
+        if (!isSupabaseConfigured()) return
+        try {
+          const data = await supaFetch('payroll_overrides', { select: '*', filter: `month=eq.${month}`, limit: 2000 })
+          const mapped: Record<string, { basic?: number; allowances?: number; deductions?: number; advance?: number }> = {}
+          for (const o of (data || [])) {
+            const pid = o.employee_id || o.delegate_id
+            if (!pid) continue
+            mapped[pid] = {
+              basic: o.basic_salary !== null ? Number(o.basic_salary) : undefined,
+              allowances: o.allowances !== null ? Number(o.allowances) : undefined,
+              deductions: o.deductions !== null ? Number(o.deductions) : undefined,
+              advance: o.advance !== null ? Number(o.advance) : undefined,
+            }
+          }
+          set({ payrollOverrides: mapped })
+        } catch (e: any) {
+          set({ error: e.message })
+        }
+      },
+
+      async savePayrollOverride(data) {
+        const { personId, employeeId, delegateId, month, basicSalary, allowances, deductions, advance } = data
+        if (!personId) return
+
+        const body: any = {
+          month,
+          basic_salary: basicSalary ?? null,
+          allowances: allowances ?? null,
+          deductions: deductions ?? null,
+          advance: advance ?? null,
+        }
+        if (employeeId) body.employee_id = employeeId
+        if (delegateId) body.delegate_id = delegateId
+
+        if (isSupabaseConfigured()) {
+          // Try upsert via POST with onConflict
+          const { error } = await supabase
+            .from('payroll_overrides')
+            .upsert(body, { onConflict: employeeId ? 'employee_id,month' : 'delegate_id,month' })
+          if (error) {
+            console.error('Failed to save payroll override:', error)
+          }
+        }
+
+        // Update local state
+        set(state => ({
+          payrollOverrides: {
+            ...state.payrollOverrides,
+            [personId]: { basic: basicSalary, allowances, deductions, advance },
+          },
+        }))
       },
     }),
     { name: 'sahl-hr-v2' }

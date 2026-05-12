@@ -325,3 +325,24 @@ CREATE TABLE IF NOT EXISTS salary_payments (
 ALTER TABLE salary_payments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "salary_payments_select" ON salary_payments FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "salary_payments_write" ON salary_payments FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));
+
+-- 19. payroll_overrides table (manual edits before running payroll)
+CREATE TABLE IF NOT EXISTS payroll_overrides (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  delegate_id UUID REFERENCES delegates(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  basic_salary DECIMAL(12,2),
+  allowances DECIMAL(12,2),
+  deductions DECIMAL(12,2),
+  advance DECIMAL(12,2),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(employee_id, month),
+  UNIQUE(delegate_id, month)
+);
+
+-- 20. RLS for payroll_overrides
+ALTER TABLE payroll_overrides ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "payroll_overrides_select" ON payroll_overrides FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "payroll_overrides_write" ON payroll_overrides FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','accountant')));

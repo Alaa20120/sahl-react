@@ -125,6 +125,12 @@ function AppDataProvider() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, () => usePurchaseStore.getState().fetch()),
       supabase.channel('expenses-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => useExpenseStore.getState().fetch()),
+      supabase.channel('delegate-warehouse-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'delegate_warehouse' }, () => useDelegateStore.getState().fetch()),
+      supabase.channel('delegate-invoices-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'delegate_invoices' }, () => useDelegateStore.getState().fetch()),
+      supabase.channel('salary-payments-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'salary_payments' }, () => useHRStore.getState().fetch()),
     ]
     channels.forEach(c => c.subscribe())
     return () => channels.forEach(c => supabase.removeChannel(c))

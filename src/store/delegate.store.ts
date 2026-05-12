@@ -516,13 +516,50 @@ export const useDelegateStore = create<DelegateStore>()(
           if (available < item.qty) return { success: false, failedItem: item.description }
         }
 
+        // Deduct sold items from delegate warehouse in Supabase
+        if (isSupabaseConfigured()) {
+          for (const item of invoice.items) {
+            if (!item.productId) continue
+            let remaining = item.qty
+            const whItems = delegate.warehouse.filter(w => w.productId === item.productId && w.qty > 0)
+            for (const whItem of whItems) {
+              if (remaining <= 0) break
+              const deduct = Math.min(whItem.qty, remaining)
+              remaining -= deduct
+              const newQty = whItem.qty - deduct
+              await supaFetch('delegate_warehouse', {
+                method: 'PATCH',
+                filter: `id=eq.${whItem.id}`,
+                body: { qty: newQty, status: newQty <= 0 ? 'transferred' : 'in-stock' },
+              })
+            }
+          }
+        }
+
         // Mark as confirmed
         set(state => ({
           delegates: state.delegates.map(d => {
             if (d.id !== delegateId) return d
+            let remainingItems = [...d.warehouse]
+            for (const item of invoice.items) {
+              if (!item.productId) continue
+              let remaining = item.qty
+              remainingItems = remainingItems.map(w => {
+                if (w.productId !== item.productId || remaining <= 0) return w
+                const deduct = Math.min(w.qty, remaining)
+                remaining -= deduct
+                return { ...w, qty: w.qty - deduct }
+              }).filter(w => w.qty > 0)
+            }
             return {
               ...d,
               invoices: d.invoices.map(inv => inv.id === invoiceId ? { ...inv, status: 'confirmed' as const, confirmedAt: new Date().toISOString().slice(0, 10) } : inv),
+              warehouse: remainingItems,
+              stats: {
+                ...d.stats,
+                totalSales: d.stats.totalSales + invoice.total,
+                externalCredit: d.stats.externalCredit + (invoice.paymentMethod === 'credit' ? invoice.total : 0),
+              },
             }
           }),
         }))
